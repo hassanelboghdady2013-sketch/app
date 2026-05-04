@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { useOutletContext } from "react-router-dom";
+import { useOutletContext, Link } from "react-router-dom";
 import {
   collection,
   query,
@@ -8,10 +8,26 @@ import {
   getDocs,
 } from "firebase/firestore";
 import { db } from "../../firebase";
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { Eye, TrendingUp, MousePointerClick } from "lucide-react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+} from "recharts";
+import { Eye, TrendingUp, MousePointerClick, BarChart3 } from "lucide-react";
 import { getPlatform } from "../../lib/platforms";
 import SkeletonLoader from "../../components/ui/SkeletonLoader";
+import Card from "../../components/ui/Card";
+import Button from "../../components/ui/Button";
+
+const ranges = [
+  { value: 7, label: "7 days" },
+  { value: 30, label: "30 days" },
+  { value: 90, label: "90 days" },
+];
 
 export default function AnalyticsSection() {
   const { profile, links } = useOutletContext();
@@ -19,6 +35,7 @@ export default function AnalyticsSection() {
   const [clicks, setClicks] = useState([]);
   const [fetched, setFetched] = useState(false);
   const [nowTs] = useState(() => Date.now());
+  const [range, setRange] = useState(30);
 
   const hasUsername = !!profile?.username;
   const loading = !fetched && hasUsername;
@@ -75,11 +92,10 @@ export default function AnalyticsSection() {
   }, [hasUsername, profile?.username, links]);
 
   const stats = useMemo(() => {
-    const weekAgo = new Date(nowTs - 7 * 24 * 60 * 60 * 1000);
-
-    const weekViews = views.filter((v) => {
+    const since = new Date(nowTs - range * 24 * 60 * 60 * 1000);
+    const rangeViews = views.filter((v) => {
       const d = v.createdAt?.toDate?.();
-      return d && d >= weekAgo;
+      return d && d >= since;
     });
 
     const clicksByLink = {};
@@ -92,20 +108,22 @@ export default function AnalyticsSection() {
 
     return {
       totalViews: views.length,
-      weekViews: weekViews.length,
+      rangeViews: rangeViews.length,
       totalClicks: clicks.length,
       topLink: topLink
-        ? { name: topLink.title || getPlatform(topLink.platform).label, clicks: clicksByLink[topLinkId] }
+        ? {
+            name: topLink.title || getPlatform(topLink.platform).label,
+            clicks: clicksByLink[topLinkId],
+          }
         : null,
       clicksByLink,
     };
-  }, [views, clicks, links, nowTs]);
+  }, [views, clicks, links, range, nowTs]);
 
   const chartData = useMemo(() => {
-    const now = nowTs;
     const days = {};
-    for (let i = 29; i >= 0; i--) {
-      const d = new Date(now - i * 24 * 60 * 60 * 1000);
+    for (let i = range - 1; i >= 0; i--) {
+      const d = new Date(nowTs - i * 24 * 60 * 60 * 1000);
       const key = d.toISOString().split("T")[0];
       days[key] = { date: key, views: 0 };
     }
@@ -117,7 +135,7 @@ export default function AnalyticsSection() {
       }
     });
     return Object.values(days);
-  }, [views, nowTs]);
+  }, [views, range, nowTs]);
 
   const topClickedLinks = useMemo(() => {
     return links
@@ -130,12 +148,14 @@ export default function AnalyticsSection() {
       .slice(0, 5);
   }, [links, stats.clicksByLink]);
 
+  const maxClicks = topClickedLinks[0]?.clickCount || 1;
+
   if (loading) {
     return (
-      <div className="space-y-6 max-w-3xl">
+      <div className="space-y-6 max-w-4xl">
         <SkeletonLoader className="h-8 w-48" />
-        <div className="grid grid-cols-3 gap-4">
-          <SkeletonLoader className="h-28" count={3} />
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <SkeletonLoader className="h-28" count={4} />
         </div>
         <SkeletonLoader className="h-64 w-full" />
       </div>
@@ -145,93 +165,188 @@ export default function AnalyticsSection() {
   if (!profile?.username) {
     return (
       <div className="max-w-3xl">
-        <h2 className="text-2xl font-bold mb-4" style={{ fontFamily: "var(--font-display)" }}>
+        <h2
+          className="text-2xl font-bold mb-4"
+          style={{ fontFamily: "var(--font-display)" }}
+        >
           Analytics
         </h2>
-        <p className="text-[#8896ab]">Set up your profile username first to start tracking analytics.</p>
+        <Card padding="xl" className="text-center">
+          <div className="w-14 h-14 rounded-2xl bg-brand-soft text-brand grid place-items-center mx-auto mb-4">
+            <BarChart3 size={22} />
+          </div>
+          <p
+            className="text-lg font-semibold mb-1.5"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            Set a username first
+          </p>
+          <p className="text-sm text-muted mb-6 max-w-sm mx-auto">
+            Pick your username in the Profile section to start tracking views and clicks.
+          </p>
+          <Button as={Link} to="/dashboard/profile">
+            Go to Profile
+          </Button>
+        </Card>
       </div>
     );
   }
 
-  return (
-    <div className="max-w-3xl">
-      <h2 className="text-xl font-bold mb-6" style={{ fontFamily: "var(--font-display)" }}>
-        Analytics
-      </h2>
+  const noData = stats.totalViews === 0 && stats.totalClicks === 0;
 
-      {/* Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-        <StatCard
-          icon={Eye}
-          label="Total Views"
-          value={stats.totalViews}
-        />
+  return (
+    <div className="max-w-4xl pb-16 lg:pb-0">
+      <header className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-6">
+        <div>
+          <h2
+            className="text-2xl font-bold tracking-tight"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            Analytics
+          </h2>
+          <p className="text-sm text-muted mt-1">
+            Page views and link clicks for your public profile.
+          </p>
+        </div>
+        <div
+          className="inline-flex p-1 bg-card border border-line rounded-lg self-start sm:self-auto"
+          role="tablist"
+          aria-label="Time range"
+        >
+          {ranges.map((r) => (
+            <button
+              key={r.value}
+              type="button"
+              role="tab"
+              aria-selected={range === r.value}
+              onClick={() => setRange(r.value)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                range === r.value
+                  ? "bg-brand-soft text-brand"
+                  : "text-muted hover:text-fg"
+              }`}
+            >
+              {r.label}
+            </button>
+          ))}
+        </div>
+      </header>
+
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
+        <StatCard icon={Eye} label="Total views" value={stats.totalViews} />
         <StatCard
           icon={TrendingUp}
-          label="This Week"
-          value={stats.weekViews}
+          label={`Last ${range} days`}
+          value={stats.rangeViews}
         />
         <StatCard
           icon={MousePointerClick}
-          label="Top Link"
-          value={stats.topLink ? `${stats.topLink.name}` : "—"}
+          label="Total clicks"
+          value={stats.totalClicks}
+        />
+        <StatCard
+          icon={BarChart3}
+          label="Top link"
+          value={stats.topLink ? stats.topLink.name : "—"}
           sub={stats.topLink ? `${stats.topLink.clicks} clicks` : "No clicks yet"}
         />
       </div>
 
       {/* Chart */}
-      <div className="p-6 rounded-xl bg-[#111827] border border-white/[0.04] mb-8">
-        <h3 className="text-sm text-[#8896ab] mb-4">Page Views — Last 30 Days</h3>
-        <ResponsiveContainer width="100%" height={250}>
-          <LineChart data={chartData}>
-            <XAxis
-              dataKey="date"
-              tick={{ fill: "#555", fontSize: 11 }}
-              tickFormatter={(d) => d.slice(5)}
-              interval="preserveStartEnd"
-            />
-            <YAxis tick={{ fill: "#555", fontSize: 11 }} allowDecimals={false} />
-            <Tooltip
-              contentStyle={{
-                background: "#111d33",
-                border: "1px solid #1e3a5f",
-                borderRadius: 12,
-                fontSize: 12,
-              }}
-            />
-            <Line
-              type="monotone"
-              dataKey="views"
-              stroke="#2563eb"
-              strokeWidth={2}
-              dot={false}
-              activeDot={{ r: 4, fill: "#2563eb" }}
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
+      <Card padding="lg" className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-medium text-muted">
+            Page views — last {range} days
+          </h3>
+        </div>
+        {noData ? (
+          <div className="h-[250px] flex flex-col items-center justify-center text-center">
+            <p className="text-sm text-muted">
+              No views yet. Share your profile to start collecting data.
+            </p>
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height={250}>
+            <LineChart
+              data={chartData}
+              margin={{ top: 5, right: 8, left: -20, bottom: 0 }}
+            >
+              <CartesianGrid stroke="var(--color-line)" strokeDasharray="3 3" vertical={false} />
+              <XAxis
+                dataKey="date"
+                tick={{ fill: "var(--color-muted)", fontSize: 11 }}
+                tickFormatter={(d) => d.slice(5)}
+                interval="preserveStartEnd"
+                axisLine={{ stroke: "var(--color-line)" }}
+                tickLine={false}
+              />
+              <YAxis
+                tick={{ fill: "var(--color-muted)", fontSize: 11 }}
+                allowDecimals={false}
+                axisLine={false}
+                tickLine={false}
+              />
+              <Tooltip
+                contentStyle={{
+                  background: "var(--color-card-hi)",
+                  border: "1px solid var(--color-line-strong)",
+                  borderRadius: 12,
+                  fontSize: 12,
+                  color: "var(--color-fg)",
+                }}
+                cursor={{ stroke: "var(--color-line-strong)" }}
+              />
+              <Line
+                type="monotone"
+                dataKey="views"
+                stroke="var(--color-brand)"
+                strokeWidth={2}
+                dot={false}
+                activeDot={{ r: 4, fill: "var(--color-brand)" }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
+      </Card>
 
-      {/* Top Clicked Links Table */}
+      {/* Top clicked links */}
       {topClickedLinks.length > 0 && (
-        <div className="p-6 rounded-xl bg-[#111827] border border-white/[0.04]">
-          <h3 className="text-sm text-[#8896ab] mb-4">Top Clicked Links</h3>
+        <Card padding="lg">
+          <h3 className="text-sm font-medium text-muted mb-4">Top clicked links</h3>
           <div className="space-y-3">
             {topClickedLinks.map((link) => {
               const Icon = link.platform.icon;
+              const pct = (link.clickCount / maxClicks) * 100;
               return (
                 <div key={link.id} className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-[#2563eb]/10 flex items-center justify-center">
-                    <Icon size={14} className="text-[#2563eb]" />
+                  <div className="w-9 h-9 rounded-lg bg-brand-soft text-brand grid place-items-center shrink-0">
+                    <Icon size={14} />
                   </div>
-                  <span className="flex-1 text-sm truncate">
-                    {link.title || link.platform.label}
-                  </span>
-                  <span className="text-sm text-[#8896ab]">{link.clickCount} clicks</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-sm font-medium truncate">
+                        {link.title || link.platform.label}
+                      </p>
+                      <p className="text-sm text-muted ml-3 shrink-0">
+                        {link.clickCount}
+                      </p>
+                    </div>
+                    <div
+                      className="h-1.5 bg-line rounded-full overflow-hidden"
+                      aria-hidden="true"
+                    >
+                      <div
+                        className="h-full bg-brand transition-all"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
                 </div>
               );
             })}
           </div>
-        </div>
+        </Card>
       )}
     </div>
   );
@@ -239,17 +354,20 @@ export default function AnalyticsSection() {
 
 function StatCard({ icon: Icon, label, value, sub }) {
   return (
-    <div className="p-5 rounded-xl bg-[#111827] border border-white/[0.04]">
+    <Card padding="md">
       <div className="flex items-center gap-2 mb-3">
-        <div className="w-8 h-8 rounded-lg bg-[#2563eb]/10 flex items-center justify-center">
-          <Icon size={16} className="text-[#2563eb]" />
+        <div className="w-8 h-8 rounded-lg bg-brand-soft text-brand grid place-items-center">
+          <Icon size={15} />
         </div>
-        <span className="text-xs text-[#8896ab]">{label}</span>
+        <span className="text-xs text-muted">{label}</span>
       </div>
-      <p className="text-2xl font-bold" style={{ fontFamily: "var(--font-display)" }}>
+      <p
+        className="text-xl font-bold tracking-tight truncate"
+        style={{ fontFamily: "var(--font-display)" }}
+      >
         {value}
       </p>
-      {sub && <p className="text-xs text-[#8896ab] mt-1">{sub}</p>}
-    </div>
+      {sub && <p className="text-xs text-muted mt-1 truncate">{sub}</p>}
+    </Card>
   );
 }

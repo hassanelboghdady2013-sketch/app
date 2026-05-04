@@ -20,12 +20,15 @@ export default function App() {
           position="top-right"
           toastOptions={{
             style: {
-              background: "#111d33",
-              color: "#fff",
-              border: "1px solid #1e3a5f",
+              background: "var(--color-card-hi)",
+              color: "var(--color-fg)",
+              border: "1px solid var(--color-line-strong)",
               borderRadius: "12px",
               fontSize: "14px",
+              boxShadow: "0 8px 24px -12px rgba(0,0,0,0.4)",
             },
+            success: { iconTheme: { primary: "var(--color-success)", secondary: "var(--color-fg)" } },
+            error: { iconTheme: { primary: "var(--color-danger)", secondary: "var(--color-fg)" } },
           }}
         />
         <Routes>

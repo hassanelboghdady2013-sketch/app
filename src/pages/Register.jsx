@@ -3,18 +3,42 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import toast from "react-hot-toast";
 import { FcGoogle } from "react-icons/fc";
+import { Eye, EyeOff } from "lucide-react";
+import AuthShell from "../components/ui/AuthShell";
+import Button from "../components/ui/Button";
+import Input from "../components/ui/Input";
+
+function passwordStrength(pw) {
+  if (!pw) return { score: 0, label: "" };
+  let score = 0;
+  if (pw.length >= 8) score++;
+  if (pw.length >= 12) score++;
+  if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) score++;
+  if (/[0-9]/.test(pw)) score++;
+  if (/[^A-Za-z0-9]/.test(pw)) score++;
+  const label = ["Too short", "Weak", "Fair", "Good", "Strong", "Very strong"][score] || "";
+  return { score, label };
+}
 
 export default function Register() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const { user, loading: authLoading, register, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
+    document.title = "Sign up — Mo Tech";
+  }, []);
+
+  useEffect(() => {
     if (!authLoading && user) navigate("/dashboard", { replace: true });
   }, [user, authLoading, navigate]);
+
+  const strength = passwordStrength(password);
+  const mismatch = confirm.length > 0 && confirm !== password;
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -47,95 +71,107 @@ export default function Register() {
       }
     } catch (err) {
       if (err.code === "auth/unauthorized-domain") {
-        toast.error("This domain is not authorized for Google sign-in. Add it in Firebase Console → Authentication → Settings → Authorized domains.");
+        toast.error(
+          "This domain is not authorized for Google sign-in. Add it in Firebase Console → Authentication → Settings → Authorized domains."
+        );
       } else if (err.code === "auth/operation-not-allowed") {
-        toast.error("Google sign-in is not enabled. Enable it in Firebase Console → Authentication → Providers.");
+        toast.error(
+          "Google sign-in is not enabled. Enable it in Firebase Console → Authentication → Providers."
+        );
       } else {
         toast.error(err.message || "Google sign-in failed");
       }
     }
   }
 
+  const strengthColor = ["bg-line-strong", "bg-danger", "bg-warning", "bg-warning", "bg-success", "bg-success"][strength.score];
+
   return (
-    <div className="min-h-screen bg-[#0b1121] flex items-center justify-center px-4">
-      <div className="w-full max-w-sm">
-        <Link to="/" className="flex items-center justify-center gap-2 mb-8">
-          <img src="/logo.png" alt="Mo Tech" className="w-9 h-9 rounded-full" />
-          <h1 className="text-xl font-bold" style={{ fontFamily: "var(--font-display)" }}>
-            Mo tech
-          </h1>
-        </Link>
+    <AuthShell
+      title="Create your page"
+      subtitle="Get your digital portfolio live in under two minutes."
+    >
+      <Button
+        variant="outline"
+        size="lg"
+        className="w-full"
+        leftIcon={<FcGoogle size={18} />}
+        onClick={handleGoogle}
+      >
+        Continue with Google
+      </Button>
 
-        <div className="bg-[#111827] border border-white/[0.04] rounded-xl p-7">
-          <h2 className="text-lg font-semibold mb-6" style={{ fontFamily: "var(--font-display)" }}>
-            Create your page
-          </h2>
-
-          <button
-            onClick={handleGoogle}
-            className="w-full flex items-center justify-center gap-2.5 py-2.5 rounded-lg border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.05] transition-colors mb-5"
-          >
-            <FcGoogle size={18} />
-            <span className="text-sm font-medium text-white">Continue with Google</span>
-          </button>
-
-          <div className="flex items-center gap-3 mb-5">
-            <div className="flex-1 h-px bg-white/[0.06]" />
-            <span className="text-xs text-[#566378]">or</span>
-            <div className="flex-1 h-px bg-white/[0.06]" />
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm text-[#8896ab] mb-1.5">Email</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="w-full px-3.5 py-2.5 rounded-lg bg-[#0b1121] border border-white/[0.06] text-white text-sm focus:outline-none focus:border-[#2563eb] transition-colors placeholder:text-[#3d4f63]"
-                placeholder="you@example.com"
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-[#8896ab] mb-1.5">Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="w-full px-3.5 py-2.5 rounded-lg bg-[#0b1121] border border-white/[0.06] text-white text-sm focus:outline-none focus:border-[#2563eb] transition-colors placeholder:text-[#3d4f63]"
-                placeholder="At least 6 characters"
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-[#8896ab] mb-1.5">Confirm Password</label>
-              <input
-                type="password"
-                value={confirm}
-                onChange={(e) => setConfirm(e.target.value)}
-                required
-                className="w-full px-3.5 py-2.5 rounded-lg bg-[#0b1121] border border-white/[0.06] text-white text-sm focus:outline-none focus:border-[#2563eb] transition-colors placeholder:text-[#3d4f63]"
-                placeholder="Confirm your password"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-2.5 rounded-lg bg-[#2563eb] text-white font-medium text-sm hover:bg-[#1d4ed8] transition-colors disabled:opacity-50"
-            >
-              {loading ? "Creating account..." : "Create Account"}
-            </button>
-          </form>
-
-          <p className="text-center text-sm text-[#8896ab] mt-6">
-            Already have an account?{" "}
-            <Link to="/login" className="text-[#2563eb] hover:text-[#3b82f6] font-medium transition-colors">
-              Sign in
-            </Link>
-          </p>
-        </div>
+      <div className="flex items-center gap-3 my-5" aria-hidden="true">
+        <div className="flex-1 h-px bg-line" />
+        <span className="text-xs text-faint uppercase tracking-wider">or</span>
+        <div className="flex-1 h-px bg-line" />
       </div>
-    </div>
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <Input
+          label="Email"
+          type="email"
+          autoComplete="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+          placeholder="you@example.com"
+        />
+        <div>
+          <Input
+            label="Password"
+            type={showPassword ? "text" : "password"}
+            autoComplete="new-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            placeholder="At least 6 characters"
+            rightSlot={
+              <button
+                type="button"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                onClick={() => setShowPassword((s) => !s)}
+                className="w-8 h-8 grid place-items-center rounded-md text-faint hover:text-fg hover:bg-card-hi transition-colors"
+              >
+                {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+              </button>
+            }
+          />
+          {password && (
+            <div className="mt-2 flex items-center gap-3">
+              <div className="flex-1 h-1 rounded-full bg-line overflow-hidden" aria-hidden="true">
+                <div
+                  className={`h-full transition-all ${strengthColor}`}
+                  style={{ width: `${(strength.score / 5) * 100}%` }}
+                />
+              </div>
+              <span className="text-xs text-muted w-20 text-right" aria-live="polite">
+                {strength.label}
+              </span>
+            </div>
+          )}
+        </div>
+        <Input
+          label="Confirm Password"
+          type={showPassword ? "text" : "password"}
+          autoComplete="new-password"
+          value={confirm}
+          onChange={(e) => setConfirm(e.target.value)}
+          required
+          placeholder="Confirm your password"
+          error={mismatch ? "Passwords do not match" : undefined}
+        />
+        <Button type="submit" size="lg" loading={loading} className="w-full">
+          {loading ? "Creating account…" : "Create account"}
+        </Button>
+      </form>
+
+      <p className="text-center text-sm text-muted mt-6">
+        Already have an account?{" "}
+        <Link to="/login" className="text-brand hover:underline font-medium">
+          Sign in
+        </Link>
+      </p>
+    </AuthShell>
   );
 }
