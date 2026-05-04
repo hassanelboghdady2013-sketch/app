@@ -9,8 +9,7 @@ import {
   getRedirectResult,
   signOut,
 } from "firebase/auth";
-import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
-import { auth, db, googleProvider } from "../firebase";
+import { auth, googleProvider } from "../firebase";
 
 const AuthContext = createContext(null);
 
@@ -25,11 +24,12 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getRedirectResult(auth).then(async (result) => {
-      if (result?.user) {
-        await ensureUserDoc(result.user);
-      }
-    }).catch(() => { /* silent */ });
+    // Resolve any in-flight redirect sign-in. Don't auto-provision a user
+    // doc — the registration flow is responsible for creating it after a
+    // valid invite code is claimed.
+    getRedirectResult(auth).catch(() => {
+      /* silent */
+    });
 
     const unsub = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
@@ -38,20 +38,8 @@ export function AuthProvider({ children }) {
     return unsub;
   }, []);
 
-  async function ensureUserDoc(firebaseUser) {
-    const userRef = doc(db, "users", firebaseUser.uid);
-    const snap = await getDoc(userRef);
-    if (!snap.exists()) {
-      await setDoc(userRef, {
-        email: firebaseUser.email,
-        createdAt: serverTimestamp(),
-      });
-    }
-  }
-
   async function register(email, password) {
     const cred = await createUserWithEmailAndPassword(auth, email, password);
-    await ensureUserDoc(cred.user);
     return cred.user;
   }
 
@@ -63,7 +51,6 @@ export function AuthProvider({ children }) {
   async function loginWithGoogle() {
     try {
       const cred = await signInWithPopup(auth, googleProvider);
-      await ensureUserDoc(cred.user);
       return cred.user;
     } catch (err) {
       if (err.code === "auth/popup-blocked" || err.code === "auth/popup-closed-by-browser") {

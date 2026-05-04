@@ -18,4 +18,15 @@ export default defineConfig([
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
   },
+  {
+    // Admin scripts run on Node; expose CommonJS + Node globals there.
+    files: ['scripts/**/*.js'],
+    languageOptions: {
+      globals: { ...globals.node },
+      sourceType: 'commonjs',
+    },
+    rules: {
+      'no-undef': 'off',
+    },
+  },
 ])

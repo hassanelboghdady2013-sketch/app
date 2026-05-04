@@ -2,25 +2,54 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    function isRegistered() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
     match /users/{uid} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
 
     match /profiles/{uid} {
       allow read: if true;
-      allow write: if request.auth != null && request.auth.uid == uid;
+      allow write: if request.auth != null
+        && request.auth.uid == uid
+        && isRegistered();
     }
 
     match /links/{linkId} {
       allow read: if true;
-      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
-      allow update, delete: if request.auth != null && resource.data.uid == request.auth.uid;
+      allow create: if request.auth != null
+        && request.resource.data.uid == request.auth.uid
+        && isRegistered();
+      allow update, delete: if request.auth != null
+        && resource.data.uid == request.auth.uid
+        && isRegistered();
     }
 
     match /usernames/{username} {
       allow read: if true;
-      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
-      allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
+      allow create: if request.auth != null
+        && request.resource.data.uid == request.auth.uid
+        && isRegistered();
+      allow delete: if request.auth != null
+        && resource.data.uid == request.auth.uid;
+    }
+
+    // Invite codes: minted by the owner via the Admin SDK (scripts/mint-invite-codes.js).
+    // Anyone can read so the registration form can verify a code, but only the
+    // first authenticated claimant can update — and only by setting claimedBy
+    // to their own uid plus claimedAt. Once claimed, the doc is immutable.
+    match /inviteCodes/{code} {
+      allow read: if true;
+      allow update: if request.auth != null
+        && (!("claimedBy" in resource.data) || resource.data.claimedBy == null)
+        && request.resource.data.claimedBy == request.auth.uid
+        && request.resource.data
+            .diff(resource.data)
+            .affectedKeys()
+            .hasOnly(["claimedBy", "claimedAt"]);
     }
 
     match /pageViews/{id} {

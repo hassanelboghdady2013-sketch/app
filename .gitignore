@@ -33,3 +33,7 @@ pnpm-debug.log*
 firebase-debug.log
 firestore-debug.log
 ui-debug.log
+
+# Service account credentials (used by scripts/mint-invite-codes.js)
+service-account.json
+service-account*.json

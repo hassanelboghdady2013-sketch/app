@@ -95,6 +95,36 @@ firebase deploy --only hosting
 | `pageViews/{id}` | Public profile page view logs |
 | `linkClicks/{id}` | Link click tracking |
 | `usernames/{username}` | Username → UID mapping for uniqueness |
+| `inviteCodes/{code}` | Single-use registration codes (gated signup) |
+
+## Invite-Code Gating
+
+Registration is gated by single-use invite codes so only people who buy a Mo
+Tech card can claim a profile. Workflow:
+
+1. **Mint codes** with the Admin SDK script:
+   ```bash
+   # one-time setup: download a service account key from
+   # Firebase Console → Project settings → Service accounts → Generate new
+   # private key, save as ./service-account.json (gitignored).
+   npm install --no-save firebase-admin
+   node scripts/mint-invite-codes.js 10
+   # or with a note for tracking:
+   node scripts/mint-invite-codes.js 1 --note="Order #123 / Salma's card"
+   ```
+   Each generated code is printed to stdout — print on the card or email it to
+   the buyer.
+2. **Buyer registers** at `/register`, enters their code, and either signs up
+   with email/password or Google. The code is claimed in a transaction and
+   becomes immutable; reusing it fails.
+3. **Server-side enforcement** — `firestore.rules` only allows writes to
+   `profiles/`, `links/`, and `usernames/` if the caller has a `users/{uid}`
+   document, which is only created after a successful invite-code claim. So
+   even a malicious user who creates an Auth account directly cannot write
+   profile data without consuming a code.
+
+Once claimed, codes cannot be unclaimed — to "transfer" a profile, the user
+should change their username and the original code stays tied to their uid.
 
 ## License
 
