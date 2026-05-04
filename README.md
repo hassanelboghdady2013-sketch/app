@@ -116,7 +116,7 @@ Admin SDK because Firestore rules don't let anyone self-promote:
 # one-time setup: download a service account key from
 # Firebase Console → Project settings → Service accounts → Generate new
 # private key, save as ./service-account.json (gitignored).
-npm install --no-save firebase-admin
+# (firebase-admin is already a devDependency — npm install picks it up.)
 
 # Grant admin to a user (look up their uid in Firebase Console →
 # Authentication → Users; or pass --email):
