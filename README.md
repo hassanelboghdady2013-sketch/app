@@ -120,9 +120,9 @@ npm install --no-save firebase-admin
 
 # Grant admin to a user (look up their uid in Firebase Console →
 # Authentication → Users; or pass --email):
-node scripts/grant-admin.js --email=you@example.com
+node scripts/grant-admin.cjs --email=you@example.com
 # Or revoke:
-node scripts/grant-admin.js --uid=AAAA1234... --revoke
+node scripts/grant-admin.cjs --uid=AAAA1234... --revoke
 ```
 
 Once your account is an admin, the "Invite codes" link appears in your
@@ -130,13 +130,18 @@ dashboard user menu and you can mint/manage codes through the UI.
 
 ### Generating codes via CLI (alternative)
 
-The original `mint-invite-codes.js` script still works if you'd rather mint
+The original `mint-invite-codes.cjs` script still works if you'd rather mint
 in bulk from a terminal:
 
 ```bash
-node scripts/mint-invite-codes.js 10
-node scripts/mint-invite-codes.js 1 --note="Order #123 / Salma's card"
+node scripts/mint-invite-codes.cjs 10
+node scripts/mint-invite-codes.cjs 1 --note="Order #123 / Salma's card"
 ```
+
+> **Why `.cjs`?** The repo is an ESM project (`"type": "module"` in
+> `package.json`), so plain `.js` files would be parsed as ESM and break
+> `require()`. `.cjs` keeps these scripts CommonJS without converting the
+> rest of the project.
 
 ### How registration works
 

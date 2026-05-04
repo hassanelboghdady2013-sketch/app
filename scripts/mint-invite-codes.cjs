@@ -9,10 +9,10 @@
  *   2. Install firebase-admin once:
  *        npm install --no-save firebase-admin
  *   3. Run:
- *        node scripts/mint-invite-codes.js [count] [--prefix=MOTECH] [--note="Order #123"]
+ *        node scripts/mint-invite-codes.cjs [count] [--prefix=MOTECH] [--note="Order #123"]
  *      Examples:
- *        node scripts/mint-invite-codes.js 10
- *        node scripts/mint-invite-codes.js 1 --note="Salma's card"
+ *        node scripts/mint-invite-codes.cjs 10
+ *        node scripts/mint-invite-codes.cjs 1 --note="Salma's card"
  *
  * Each generated code is written to the `inviteCodes` collection with
  * `claimedBy = null`. Hand the printed codes to your buyers (print on the

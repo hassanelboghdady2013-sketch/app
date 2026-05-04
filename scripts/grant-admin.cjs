@@ -14,12 +14,12 @@
  *   2. Install firebase-admin once if you haven't already:
  *        npm install --no-save firebase-admin
  *   3. Run with the user's uid OR email:
- *        node scripts/grant-admin.js --uid=AAAA1234...
- *        node scripts/grant-admin.js --email=you@example.com
+ *        node scripts/grant-admin.cjs --uid=AAAA1234...
+ *        node scripts/grant-admin.cjs --email=you@example.com
  *      Find a user's uid in Firebase Console → Authentication → Users.
  *
  * To revoke admin, pass --revoke to delete the doc:
- *   node scripts/grant-admin.js --uid=AAAA1234... --revoke
+ *   node scripts/grant-admin.cjs --uid=AAAA1234... --revoke
  */
 
 const fs = require("fs");
