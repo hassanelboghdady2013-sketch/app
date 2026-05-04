@@ -7,8 +7,21 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/users/$(request.auth.uid));
     }
 
+    function isAdmin() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
     match /users/{uid} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Admin role is just a presence-check on this collection. Bootstrap the
+    // first admin doc with the Admin SDK (scripts/grant-admin.js) — no
+    // self-promotion is allowed.
+    match /admins/{uid} {
+      allow get: if request.auth != null && request.auth.uid == uid;
+      allow list: if isAdmin();
     }
 
     match /profiles/{uid} {
@@ -37,12 +50,20 @@ service cloud.firestore {
         && resource.data.uid == request.auth.uid;
     }
 
-    // Invite codes: minted by the owner via the Admin SDK (scripts/mint-invite-codes.js).
-    // Anyone can read so the registration form can verify a code, but only the
-    // first authenticated claimant can update — and only by setting claimedBy
-    // to their own uid plus claimedAt. Once claimed, the doc is immutable.
+    // Invite codes:
+    //   - Anyone can `get` a single code (so /register can verify a code).
+    //   - Only admins can `list` the collection (no enumeration by buyers).
+    //   - Only admins can `create` new codes (the admin UI / scripts use this).
+    //   - Any signed-in user can `update` to claim an unclaimed code by
+    //     setting claimedBy = their own uid + claimedAt; nothing else can
+    //     change.
+    //   - Only admins can `delete`, and only on still-unclaimed codes.
     match /inviteCodes/{code} {
-      allow read: if true;
+      allow get: if true;
+      allow list: if isAdmin();
+      allow create: if isAdmin()
+        && (!("claimedBy" in request.resource.data)
+            || request.resource.data.claimedBy == null);
       allow update: if request.auth != null
         && (!("claimedBy" in resource.data) || resource.data.claimedBy == null)
         && request.resource.data.claimedBy == request.auth.uid
@@ -50,6 +71,8 @@ service cloud.firestore {
             .diff(resource.data)
             .affectedKeys()
             .hasOnly(["claimedBy", "claimedAt"]);
+      allow delete: if isAdmin()
+        && (!("claimedBy" in resource.data) || resource.data.claimedBy == null);
     }
 
     match /pageViews/{id} {

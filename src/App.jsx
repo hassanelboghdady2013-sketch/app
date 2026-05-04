@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { Toaster } from "react-hot-toast";
 import ProtectedRoute from "./components/ProtectedRoute";
+import AdminRoute from "./components/AdminRoute";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -10,6 +11,7 @@ import ProfileSection from "./pages/dashboard/ProfileSection";
 import LinksSection from "./pages/dashboard/LinksSection";
 import AppearanceSection from "./pages/dashboard/AppearanceSection";
 import AnalyticsSection from "./pages/dashboard/AnalyticsSection";
+import AdminCodes from "./pages/admin/AdminCodes";
 import PublicProfile from "./pages/PublicProfile";
 
 export default function App() {
@@ -49,6 +51,14 @@ export default function App() {
             <Route path="appearance" element={<AppearanceSection />} />
             <Route path="analytics" element={<AnalyticsSection />} />
           </Route>
+          <Route
+            path="/admin/codes"
+            element={
+              <AdminRoute>
+                <AdminCodes />
+              </AdminRoute>
+            }
+          />
           <Route path="/:username" element={<PublicProfile />} />
         </Routes>
       </BrowserRouter>

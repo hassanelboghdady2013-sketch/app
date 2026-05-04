@@ -20,10 +20,12 @@ import {
   Smartphone,
   X,
   ChevronDown,
+  Ticket,
 } from "lucide-react";
 import MobilePreview from "../../components/dashboard/MobilePreview";
 import Logo from "../../components/ui/Logo";
 import IconButton from "../../components/ui/IconButton";
+import { isUserAdmin } from "../../lib/inviteCodes";
 import toast from "react-hot-toast";
 
 const navItems = [
@@ -38,7 +40,7 @@ function pageTitleFor(pathname) {
   return item?.label || "Dashboard";
 }
 
-function UserMenu({ user, profile, onLogout }) {
+function UserMenu({ user, profile, isAdmin, onLogout }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -103,6 +105,17 @@ function UserMenu({ user, profile, onLogout }) {
               View public profile
             </a>
           )}
+          {isAdmin && (
+            <Link
+              to="/admin/codes"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-muted hover:text-fg hover:bg-card-hi transition-colors"
+            >
+              <Ticket size={14} />
+              Invite codes
+            </Link>
+          )}
           <button
             type="button"
             role="menuitem"
@@ -128,6 +141,18 @@ export default function DashboardLayout() {
   const [profile, setProfile] = useState(null);
   const [links, setLinks] = useState([]);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    isUserAdmin(user.uid).then((ok) => {
+      if (!cancelled) setIsAdmin(ok);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   useEffect(() => {
     if (!user) return;
@@ -255,7 +280,12 @@ export default function DashboardLayout() {
             >
               <Smartphone size={16} />
             </IconButton>
-            <UserMenu user={user} profile={profile} onLogout={handleLogout} />
+            <UserMenu
+              user={user}
+              profile={profile}
+              isAdmin={isAdmin}
+              onLogout={handleLogout}
+            />
           </div>
         </div>
       </header>
