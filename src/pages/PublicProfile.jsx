@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, Link as RouterLink } from "react-router-dom";
 import {
   doc,
   getDoc,
@@ -14,7 +14,8 @@ import {
 import { db } from "../firebase";
 import { getPlatform } from "../lib/platforms";
 import { getThemeCSS } from "../lib/themes";
-import { Share2, Download, ChevronRight } from "lucide-react";
+import { Share2, Download, ChevronRight, Copy, Check, QrCode } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import SkeletonLoader from "../components/ui/SkeletonLoader";
 import toast, { Toaster } from "react-hot-toast";
 
@@ -24,6 +25,8 @@ export default function PublicProfile() {
   const [links, setLinks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [showQR, setShowQR] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     async function fetchProfile() {
@@ -63,7 +66,9 @@ export default function PublicProfile() {
             const result = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
             result.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
             setLinks(result);
-          } catch { /* silent */ }
+          } catch {
+            /* silent */
+          }
         }
 
         addDoc(collection(db, "pageViews"), {
@@ -71,7 +76,9 @@ export default function PublicProfile() {
           device: navigator.userAgent,
           referrer: document.referrer || "",
           createdAt: serverTimestamp(),
-        }).catch(() => { /* silent */ });
+        }).catch(() => {
+          /* silent */
+        });
       } catch (err) {
         console.error(err);
         setNotFound(true);
@@ -83,11 +90,21 @@ export default function PublicProfile() {
     if (username) fetchProfile();
   }, [username]);
 
+  useEffect(() => {
+    if (profile?.name) {
+      document.title = `${profile.name} — Mo Tech`;
+    } else if (notFound) {
+      document.title = "Profile not found — Mo Tech";
+    }
+  }, [profile, notFound]);
+
   function handleLinkClick(linkId, url) {
     addDoc(collection(db, "linkClicks"), {
       linkId,
       createdAt: serverTimestamp(),
-    }).catch(() => { /* silent */ });
+    }).catch(() => {
+      /* silent */
+    });
     window.open(url, "_blank", "noopener,noreferrer");
   }
 
@@ -122,7 +139,7 @@ export default function PublicProfile() {
     a.download = `${profile.name || username}.vcf`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success("Contact downloaded!");
+    toast.success("Contact downloaded");
   }
 
   async function handleShare() {
@@ -130,20 +147,28 @@ export default function PublicProfile() {
     if (navigator.share) {
       try {
         await navigator.share({ title: profile?.name || username, url });
-      } catch { /* user cancelled */ }
-    } else {
-      try {
-        await navigator.clipboard.writeText(url);
-        toast.success("Link copied!");
       } catch {
-        toast.error("Failed to copy");
+        /* user cancelled */
       }
+    } else {
+      handleCopy();
+    }
+  }
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setCopied(true);
+      toast.success("Link copied");
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Failed to copy");
     }
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0a1628] flex items-center justify-center">
+      <div className="min-h-screen bg-app flex items-center justify-center">
         <div className="w-full max-w-[420px] px-6 py-12 space-y-6">
           <div className="flex flex-col items-center">
             <SkeletonLoader className="w-24 h-24 rounded-full" />
@@ -158,18 +183,35 @@ export default function PublicProfile() {
 
   if (notFound) {
     return (
-      <div className="min-h-screen bg-[#0a1628] flex items-center justify-center">
-        <div className="text-center px-6">
-          <h1 className="text-6xl font-bold text-[#2563eb] mb-4" style={{ fontFamily: "var(--font-display)" }}>
-            404
-          </h1>
-          <p className="text-[#94a3b8] mb-6">This profile doesn&apos;t exist yet.</p>
-          <a
-            href="/"
-            className="px-6 py-3 rounded-xl bg-[#2563eb] text-white font-medium text-sm hover:bg-[#1d4ed8] transition-colors inline-block"
+      <div className="min-h-screen bg-app text-fg flex items-center justify-center px-6">
+        <div className="text-center max-w-md">
+          <div className="inline-flex w-16 h-16 rounded-2xl bg-brand-soft text-brand items-center justify-center mb-5">
+            <span className="text-2xl font-bold">404</span>
+          </div>
+          <h1
+            className="text-3xl font-bold mb-2 tracking-tight"
+            style={{ fontFamily: "var(--font-display)" }}
           >
-            Create Your Own
-          </a>
+            Profile not found
+          </h1>
+          <p className="text-muted mb-7 leading-relaxed">
+            The page <span className="font-mono text-fg">@{username}</span>{" "}
+            doesn&apos;t exist — yet. Want to claim it?
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <RouterLink
+              to="/register"
+              className="inline-flex items-center justify-center h-11 px-5 rounded-lg bg-brand text-white font-medium text-sm hover:bg-brand-hover transition-colors"
+            >
+              Create your page
+            </RouterLink>
+            <RouterLink
+              to="/"
+              className="inline-flex items-center justify-center h-11 px-5 rounded-lg border border-line-strong text-muted hover:text-fg hover:bg-card font-medium text-sm transition-colors"
+            >
+              Back home
+            </RouterLink>
+          </div>
         </div>
       </div>
     );
@@ -177,6 +219,13 @@ export default function PublicProfile() {
 
   const theme = profile?.themeJson || {};
   const cssVars = getThemeCSS(theme);
+  const accent = cssVars["--theme-accent"] || "#2563eb";
+  const bg = cssVars["--theme-bg"] || "#0a1628";
+  const textSecondary = cssVars["--theme-text-secondary"] || "rgba(255,255,255,0.7)";
+  const cardBg = cssVars["--theme-card-bg"] || "rgba(255,255,255,0.06)";
+  const cardBorder = cssVars["--theme-card-border"] || "rgba(255,255,255,0.1)";
+  const cardBackdrop = cssVars["--theme-card-backdrop"] || "blur(12px)";
+  const cardShadow = cssVars["--theme-card-shadow"] || "none";
   const activeLinks = links.filter((l) => l.active !== false);
 
   return (
@@ -184,72 +233,115 @@ export default function PublicProfile() {
       className="min-h-screen flex flex-col items-center"
       style={{
         ...cssVars,
-        backgroundColor: cssVars["--theme-bg"] || "#0a1628",
+        backgroundColor: bg,
         fontFamily: cssVars["--theme-font"] || "var(--font-body)",
         color: cssVars["--theme-text"] || "#ffffff",
       }}
     >
       <Toaster position="top-center" />
-      <div className="w-full max-w-[420px] px-6 py-12">
+      <div className="w-full max-w-[440px] px-6 py-12 sm:py-16">
         {/* Avatar */}
-        <div className="flex flex-col items-center text-center mb-10">
+        <div className="flex flex-col items-center text-center mb-8">
           {profile?.avatarUrl ? (
             <img
               src={profile.avatarUrl}
               alt={profile.name}
               className="w-24 h-24 rounded-full object-cover animate-scale-in"
+              style={{ boxShadow: `0 8px 32px -8px ${accent}66` }}
             />
           ) : (
             <div
               className="w-24 h-24 rounded-full flex items-center justify-center text-4xl font-bold animate-scale-in"
-              style={{ backgroundColor: cssVars["--theme-accent"] || "#2563eb", color: cssVars["--theme-bg"] || "#0a1628" }}
+              style={{ backgroundColor: accent, color: bg }}
             >
               {profile?.name?.[0] || "?"}
             </div>
           )}
           <h1
-            className="text-2xl font-bold mt-4"
+            className="text-2xl font-bold mt-5 tracking-tight"
             style={{ fontFamily: cssVars["--theme-font"] || "var(--font-display)" }}
           >
             {profile?.name}
           </h1>
           {profile?.title && (
-            <p className="text-sm mt-1" style={{ color: cssVars["--theme-text-secondary"] }}>
+            <p className="text-sm mt-1" style={{ color: textSecondary }}>
               {profile.title}
             </p>
           )}
           {profile?.bio && (
             <p
-              className="text-sm mt-3 max-w-xs leading-relaxed"
-              style={{ color: cssVars["--theme-text-secondary"] }}
+              className="text-sm mt-4 max-w-xs leading-relaxed"
+              style={{ color: textSecondary }}
             >
               {profile.bio}
             </p>
           )}
-
-          {/* Action Buttons */}
-          <div className="flex gap-3 mt-6">
-            <button
-              onClick={handleSaveContact}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors"
-              style={{
-                backgroundColor: cssVars["--theme-accent"] || "#2563eb",
-                color: cssVars["--theme-bg"] || "#0a1628",
-              }}
-            >
-              <Download size={14} />
-              Save Contact
-            </button>
-            <button
-              onClick={handleShare}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm border transition-colors"
-              style={{ borderColor: cssVars["--theme-card-border"] || "rgba(255,255,255,0.1)" }}
-            >
-              <Share2 size={14} />
-              Share
-            </button>
-          </div>
         </div>
+
+        {/* Primary action row */}
+        <div className="flex items-center gap-2 mb-8">
+          <button
+            type="button"
+            onClick={handleSaveContact}
+            className="flex-1 inline-flex items-center justify-center gap-2 h-11 rounded-xl text-sm font-medium transition-transform hover:scale-[1.01] active:scale-[0.99]"
+            style={{ backgroundColor: accent, color: bg }}
+          >
+            <Download size={15} />
+            Save contact
+          </button>
+          <button
+            type="button"
+            onClick={handleShare}
+            aria-label="Share"
+            className="w-11 h-11 inline-flex items-center justify-center rounded-xl transition-transform hover:scale-[1.05] active:scale-[0.95]"
+            style={{
+              backgroundColor: cardBg,
+              border: `1px solid ${cardBorder}`,
+              backdropFilter: cardBackdrop,
+              boxShadow: cardShadow,
+            }}
+          >
+            <Share2 size={15} />
+          </button>
+          <button
+            type="button"
+            onClick={handleCopy}
+            aria-label={copied ? "Link copied" : "Copy link"}
+            className="w-11 h-11 inline-flex items-center justify-center rounded-xl transition-transform hover:scale-[1.05] active:scale-[0.95]"
+            style={{
+              backgroundColor: cardBg,
+              border: `1px solid ${cardBorder}`,
+              backdropFilter: cardBackdrop,
+              boxShadow: cardShadow,
+            }}
+          >
+            {copied ? <Check size={15} /> : <Copy size={15} />}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowQR((v) => !v)}
+            aria-label={showQR ? "Hide QR" : "Show QR"}
+            aria-expanded={showQR}
+            className="w-11 h-11 inline-flex items-center justify-center rounded-xl transition-transform hover:scale-[1.05] active:scale-[0.95]"
+            style={{
+              backgroundColor: showQR ? accent : cardBg,
+              color: showQR ? bg : "inherit",
+              border: `1px solid ${cardBorder}`,
+              backdropFilter: cardBackdrop,
+              boxShadow: cardShadow,
+            }}
+          >
+            <QrCode size={15} />
+          </button>
+        </div>
+
+        {showQR && (
+          <div className="mb-7 flex justify-center animate-scale-in">
+            <div className="bg-white p-4 rounded-2xl">
+              <QRCodeSVG value={window.location.href} size={180} />
+            </div>
+          </div>
+        )}
 
         {/* Links */}
         <div className="space-y-3">
@@ -260,43 +352,44 @@ export default function PublicProfile() {
               <button
                 key={link.id}
                 onClick={() => handleLinkClick(link.id, link.url)}
-                className="w-full flex items-center gap-4 p-4 rounded-2xl text-left transition-all hover:scale-[1.02] active:scale-[0.98] ripple stagger-up"
+                className="w-full flex items-center gap-4 p-4 rounded-2xl text-left transition-all hover:scale-[1.02] active:scale-[0.98] stagger-up"
                 style={{
-                  backgroundColor: cssVars["--theme-card-bg"] || "rgba(255,255,255,0.06)",
-                  border: `1px solid ${cssVars["--theme-card-border"] || "rgba(255,255,255,0.1)"}`,
-                  backdropFilter: cssVars["--theme-card-backdrop"] || "blur(12px)",
-                  animationDelay: `${index * 80}ms`,
+                  backgroundColor: cardBg,
+                  border: `1px solid ${cardBorder}`,
+                  backdropFilter: cardBackdrop,
+                  boxShadow: cardShadow,
+                  animationDelay: `${index * 70}ms`,
                 }}
               >
                 <div
                   className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                  style={{ backgroundColor: `${cssVars["--theme-accent"] || "#2563eb"}15` }}
+                  style={{ backgroundColor: `${accent}1f` }}
                 >
-                  <Icon size={18} style={{ color: cssVars["--theme-accent"] || "#2563eb" }} />
+                  <Icon size={18} style={{ color: accent }} />
                 </div>
                 <span className="flex-1 font-medium text-sm">
                   {link.title || platform.label}
                 </span>
-                <ChevronRight size={16} style={{ color: cssVars["--theme-text-secondary"] }} />
+                <ChevronRight size={16} style={{ color: textSecondary }} />
               </button>
             );
           })}
         </div>
 
         {activeLinks.length === 0 && (
-          <p className="text-center text-sm" style={{ color: cssVars["--theme-text-secondary"] }}>
+          <p className="text-center text-sm" style={{ color: textSecondary }}>
             No links yet
           </p>
         )}
 
         {/* Footer */}
-        <div className="mt-12 text-center">
+        <div className="mt-14 text-center">
           <a
             href="/"
             className="text-xs font-medium transition-colors hover:opacity-80"
-            style={{ color: cssVars["--theme-text-secondary"] }}
+            style={{ color: textSecondary }}
           >
-            Powered by <span style={{ color: cssVars["--theme-accent"] || "#2563eb" }}>Mo Tech</span>
+            Powered by <span style={{ color: accent }}>Mo Tech</span>
           </a>
         </div>
       </div>

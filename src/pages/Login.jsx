@@ -3,13 +3,22 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import toast from "react-hot-toast";
 import { FcGoogle } from "react-icons/fc";
+import { Eye, EyeOff } from "lucide-react";
+import AuthShell from "../components/ui/AuthShell";
+import Button from "../components/ui/Button";
+import Input from "../components/ui/Input";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const { user, loading: authLoading, login, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    document.title = "Log in — Mo Tech";
+  }, []);
 
   useEffect(() => {
     if (!authLoading && user) navigate("/dashboard", { replace: true });
@@ -38,9 +47,13 @@ export default function Login() {
       }
     } catch (err) {
       if (err.code === "auth/unauthorized-domain") {
-        toast.error("This domain is not authorized for Google sign-in. Add it in Firebase Console → Authentication → Settings → Authorized domains.");
+        toast.error(
+          "This domain is not authorized for Google sign-in. Add it in Firebase Console → Authentication → Settings → Authorized domains."
+        );
       } else if (err.code === "auth/operation-not-allowed") {
-        toast.error("Google sign-in is not enabled. Enable it in Firebase Console → Authentication → Providers.");
+        toast.error(
+          "Google sign-in is not enabled. Enable it in Firebase Console → Authentication → Providers."
+        );
       } else {
         toast.error(err.message || "Google sign-in failed");
       }
@@ -48,74 +61,63 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0b1121] flex items-center justify-center px-4">
-      <div className="w-full max-w-sm">
-        <Link to="/" className="flex items-center justify-center gap-2 mb-8">
-          <img src="/logo.png" alt="Mo Tech" className="w-9 h-9 rounded-full" />
-          <h1 className="text-xl font-bold" style={{ fontFamily: "var(--font-display)" }}>
-            Mo tech
-          </h1>
-        </Link>
+    <AuthShell title="Welcome back" subtitle="Log in to manage your Mo Tech profile.">
+      <Button
+        variant="outline"
+        size="lg"
+        className="w-full"
+        leftIcon={<FcGoogle size={18} />}
+        onClick={handleGoogle}
+      >
+        Continue with Google
+      </Button>
 
-        <div className="bg-[#111827] border border-white/[0.04] rounded-xl p-7">
-          <h2 className="text-lg font-semibold mb-6" style={{ fontFamily: "var(--font-display)" }}>
-            Welcome back
-          </h2>
-
-          <button
-            onClick={handleGoogle}
-            className="w-full flex items-center justify-center gap-2.5 py-2.5 rounded-lg border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.05] transition-colors mb-5"
-          >
-            <FcGoogle size={18} />
-            <span className="text-sm font-medium text-white">Continue with Google</span>
-          </button>
-
-          <div className="flex items-center gap-3 mb-5">
-            <div className="flex-1 h-px bg-white/[0.06]" />
-            <span className="text-xs text-[#566378]">or</span>
-            <div className="flex-1 h-px bg-white/[0.06]" />
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm text-[#8896ab] mb-1.5">Email</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="w-full px-3.5 py-2.5 rounded-lg bg-[#0b1121] border border-white/[0.06] text-white text-sm focus:outline-none focus:border-[#2563eb] transition-colors placeholder:text-[#3d4f63]"
-                placeholder="you@example.com"
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-[#8896ab] mb-1.5">Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="w-full px-3.5 py-2.5 rounded-lg bg-[#0b1121] border border-white/[0.06] text-white text-sm focus:outline-none focus:border-[#2563eb] transition-colors placeholder:text-[#3d4f63]"
-                placeholder="Enter your password"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-2.5 rounded-lg bg-[#2563eb] text-white font-medium text-sm hover:bg-[#1d4ed8] transition-colors disabled:opacity-50"
-            >
-              {loading ? "Signing in..." : "Sign In"}
-            </button>
-          </form>
-
-          <p className="text-center text-sm text-[#8896ab] mt-6">
-            Don&apos;t have an account?{" "}
-            <Link to="/register" className="text-[#2563eb] hover:text-[#3b82f6] font-medium transition-colors">
-              Sign up
-            </Link>
-          </p>
-        </div>
+      <div className="flex items-center gap-3 my-5" aria-hidden="true">
+        <div className="flex-1 h-px bg-line" />
+        <span className="text-xs text-faint uppercase tracking-wider">or</span>
+        <div className="flex-1 h-px bg-line" />
       </div>
-    </div>
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <Input
+          label="Email"
+          type="email"
+          autoComplete="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+          placeholder="you@example.com"
+        />
+        <Input
+          label="Password"
+          type={showPassword ? "text" : "password"}
+          autoComplete="current-password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          placeholder="Enter your password"
+          rightSlot={
+            <button
+              type="button"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              onClick={() => setShowPassword((s) => !s)}
+              className="w-8 h-8 grid place-items-center rounded-md text-faint hover:text-fg hover:bg-card-hi transition-colors"
+            >
+              {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+            </button>
+          }
+        />
+        <Button type="submit" size="lg" loading={loading} className="w-full">
+          {loading ? "Signing in…" : "Sign in"}
+        </Button>
+      </form>
+
+      <p className="text-center text-sm text-muted mt-6">
+        Don&apos;t have an account?{" "}
+        <Link to="/register" className="text-brand hover:underline font-medium">
+          Sign up
+        </Link>
+      </p>
+    </AuthShell>
   );
 }
