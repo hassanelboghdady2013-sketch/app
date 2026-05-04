@@ -1,5 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "../firebase";
 import { useAuth } from "../contexts/AuthContext";
 import toast from "react-hot-toast";
 import { FcGoogle } from "react-icons/fc";
@@ -15,13 +17,18 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const { user, loading: authLoading, login, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
+  // Set while handleGoogle is running so the "already signed in → dashboard"
+  // effect below doesn't race with the in-flight users/{uid} check.
+  const handlingGoogleRef = useRef(false);
 
   useEffect(() => {
     document.title = "Log in — Mo Tech";
   }, []);
 
   useEffect(() => {
-    if (!authLoading && user) navigate("/dashboard", { replace: true });
+    if (!authLoading && user && !handlingGoogleRef.current) {
+      navigate("/dashboard", { replace: true });
+    }
   }, [user, authLoading, navigate]);
 
   async function handleSubmit(e) {
@@ -39,13 +46,15 @@ export default function Login() {
   }
 
   async function handleGoogle() {
+    handlingGoogleRef.current = true;
+    let signedInUser;
     try {
-      const result = await loginWithGoogle();
-      if (result) {
-        toast.success("Welcome!");
-        navigate("/dashboard");
-      }
+      signedInUser = await loginWithGoogle();
     } catch (err) {
+      // Google popup itself failed — the user is NOT signed in, so it's
+      // safe to clear the ref and let the auto-redirect effect resume its
+      // normal "already signed in → dashboard" behavior on the next mount.
+      handlingGoogleRef.current = false;
       if (err.code === "auth/unauthorized-domain") {
         toast.error(
           "This domain is not authorized for Google sign-in. Add it in Firebase Console → Authentication → Settings → Authorized domains."
@@ -57,6 +66,26 @@ export default function Login() {
       } else {
         toast.error(err.message || "Google sign-in failed");
       }
+      return;
+    }
+    if (!signedInUser) return; // redirect flow — getRedirectResult will handle it on the next page
+
+    // Sign-in succeeded — figure out where to send them. If the profile
+    // lookup itself fails (network blip, Firestore outage), don't strand
+    // them on /login: navigate to /dashboard and let ProtectedRoute do the
+    // remaining work (it'll either show the dashboard or bounce to
+    // /register?need-invite=1 once Firestore recovers).
+    try {
+      const profileSnap = await getDoc(doc(db, "users", signedInUser.uid));
+      if (profileSnap.exists()) {
+        toast.success("Welcome back!");
+        navigate("/dashboard");
+      } else {
+        navigate("/register?need-invite=1");
+      }
+    } catch {
+      toast.error("Signed in, but we couldn't check your profile yet.");
+      navigate("/dashboard");
     }
   }
 
