@@ -12,7 +12,6 @@ import {
   ClipboardList,
   PenTool,
   Send,
-  Check,
   Menu,
   X,
 } from "lucide-react";
@@ -105,55 +104,6 @@ const testimonials = [
   },
 ];
 
-const plans = [
-  {
-    name: "Starter",
-    price: "Free",
-    period: "forever",
-    desc: "Everything you need to get online — no credit card required.",
-    features: [
-      "Custom username and link",
-      "Up to 10 links",
-      "4 theme presets",
-      "Basic analytics",
-    ],
-    cta: "Start free",
-    variant: "outline",
-    highlight: false,
-  },
-  {
-    name: "Pro",
-    price: "EGP 199",
-    period: "per month",
-    desc: "Unlimited links, full theming, and richer analytics for power users.",
-    features: [
-      "Unlimited links",
-      "Full custom theming",
-      "Advanced analytics + 90-day history",
-      "Priority support",
-      "Remove Mo Tech footer",
-    ],
-    cta: "Go Pro",
-    variant: "primary",
-    highlight: true,
-  },
-  {
-    name: "Card",
-    price: "EGP 499",
-    period: "one-time",
-    desc: "A premium NFC business card programmed with your profile.",
-    features: [
-      "Premium PVC card with your design",
-      "Programmed to your profile",
-      "Worldwide shipping",
-      "Pro plan included for 1 year",
-    ],
-    cta: "Order card",
-    variant: "secondary",
-    highlight: false,
-  },
-];
-
 function PhoneMock() {
   const sampleLinks = [
     { label: "Portfolio", color: "#2563eb" },
@@ -231,9 +181,6 @@ export default function Landing() {
             <a href="#how-it-works" className="text-sm text-muted hover:text-fg transition-colors">
               How it works
             </a>
-            <a href="#pricing" className="text-sm text-muted hover:text-fg transition-colors">
-              Pricing
-            </a>
           </div>
           <div className="hidden md:flex items-center gap-3">
             <Link
@@ -272,13 +219,6 @@ export default function Landing() {
                 className="block py-2 text-sm text-muted hover:text-fg"
               >
                 How it works
-              </a>
-              <a
-                href="#pricing"
-                onClick={() => setNavOpen(false)}
-                className="block py-2 text-sm text-muted hover:text-fg"
-              >
-                Pricing
               </a>
               <div className="flex gap-2 pt-2">
                 <Button as={Link} to="/login" variant="outline" size="md" className="flex-1">
@@ -415,68 +355,6 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Pricing */}
-      <section id="pricing" className="py-20 md:py-24 border-t border-line">
-        <div className="max-w-6xl mx-auto px-5 lg:px-8">
-          <div className="text-center mb-14 max-w-2xl mx-auto">
-            <Badge variant="outline" className="mb-4">Pricing</Badge>
-            <h2
-              className="text-3xl md:text-4xl font-bold mb-3"
-              style={{ fontFamily: "var(--font-display)" }}
-            >
-              Pricing as simple as a tap.
-            </h2>
-            <p className="text-muted">Start free. Upgrade when you outgrow it.</p>
-          </div>
-          <div className="grid md:grid-cols-3 gap-4">
-            {plans.map((p) => (
-              <div
-                key={p.name}
-                className={`relative rounded-2xl p-7 flex flex-col ${
-                  p.highlight
-                    ? "bg-gradient-to-b from-brand-soft to-card border border-brand/30 shadow-[0_30px_60px_-20px_rgba(37,99,235,0.4)]"
-                    : "bg-card border border-line"
-                }`}
-              >
-                {p.highlight && (
-                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-brand text-white text-xs font-medium">
-                    Most popular
-                  </span>
-                )}
-                <h3
-                  className="text-lg font-semibold mb-1"
-                  style={{ fontFamily: "var(--font-display)" }}
-                >
-                  {p.name}
-                </h3>
-                <p className="text-sm text-muted mb-5">{p.desc}</p>
-                <div className="mb-6">
-                  <span className="text-4xl font-bold tracking-tight">{p.price}</span>
-                  <span className="text-sm text-muted ml-1.5">{p.period}</span>
-                </div>
-                <ul className="space-y-2.5 mb-7 grow">
-                  {p.features.map((feat) => (
-                    <li key={feat} className="flex items-start gap-2.5 text-sm">
-                      <Check size={16} className="text-success mt-0.5 shrink-0" />
-                      <span className="text-fg/90">{feat}</span>
-                    </li>
-                  ))}
-                </ul>
-                <Button
-                  as={Link}
-                  to="/register"
-                  variant={p.variant}
-                  size="lg"
-                  className="w-full"
-                >
-                  {p.cta}
-                </Button>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* Testimonials */}
       <section className="py-20 md:py-24 border-t border-line">
         <div className="max-w-7xl mx-auto px-5 lg:px-8">
@@ -594,11 +472,6 @@ export default function Landing() {
                 <li>
                   <a href="#features" className="text-muted hover:text-fg transition-colors">
                     Features
-                  </a>
-                </li>
-                <li>
-                  <a href="#pricing" className="text-muted hover:text-fg transition-colors">
-                    Pricing
                   </a>
                 </li>
                 <li>

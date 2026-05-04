@@ -46,7 +46,10 @@ export default function ProfileSection() {
   const [showQR, setShowQR] = useState(false);
   const [copied, setCopied] = useState(false);
   const [initialState, setInitialState] = useState(null);
-  const loading = !profile && !user;
+  // Profile is null until the auth + Firestore snapshot resolve; for brand-new
+  // users the snapshot returns an empty object (set in DashboardLayout) so the
+  // form renders with empty defaults and the save bar can appear.
+  const loading = !user || profile === null;
   const debounceRef = useRef(null);
   const originalUsername = useRef("");
   const initialized = useRef(false);

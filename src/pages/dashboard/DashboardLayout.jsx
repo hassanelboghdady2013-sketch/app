@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
+import { Link, NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import {
   doc,
@@ -8,7 +8,6 @@ import {
   where,
   orderBy,
   onSnapshot,
-  getDocs,
 } from "firebase/firestore";
 import { db } from "../../firebase";
 import {
@@ -133,14 +132,28 @@ export default function DashboardLayout() {
   useEffect(() => {
     if (!user) return;
     const unsub = onSnapshot(doc(db, "profiles", user.uid), (snap) => {
-      if (snap.exists()) setProfile(snap.data());
+      // Treat a missing profile doc as a fresh, empty profile so the editor
+      // can render and the save bar can appear for first-time users.
+      setProfile(snap.exists() ? snap.data() : {});
     });
     return unsub;
   }, [user]);
 
   useEffect(() => {
     if (!user) return;
+    let active = true;
     let unsub;
+
+    function subscribeFallback() {
+      if (!active) return;
+      const fallbackQ = query(collection(db, "links"), where("uid", "==", user.uid));
+      unsub = onSnapshot(fallbackQ, (snap) => {
+        const result = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        result.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+        setLinks(result);
+      });
+    }
+
     try {
       const q = query(
         collection(db, "links"),
@@ -149,25 +162,22 @@ export default function DashboardLayout() {
       );
       unsub = onSnapshot(
         q,
-        (snap) => {
-          setLinks(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-        },
-        async () => {
-          try {
-            const fallbackQ = query(collection(db, "links"), where("uid", "==", user.uid));
-            const snap = await getDocs(fallbackQ);
-            const result = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-            result.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-            setLinks(result);
-          } catch {
-            /* silent */
-          }
+        (snap) => setLinks(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+        () => {
+          // Composite index missing — fall back to a snapshot listener
+          // without orderBy and sort client-side so the live preview keeps
+          // updating in real time.
+          if (unsub) unsub();
+          subscribeFallback();
         }
       );
     } catch {
-      /* index not ready */
+      subscribeFallback();
     }
-    return () => unsub && unsub();
+    return () => {
+      active = false;
+      if (unsub) unsub();
+    };
   }, [user]);
 
   useEffect(() => {
@@ -192,7 +202,9 @@ export default function DashboardLayout() {
       <header className="sticky top-0 z-40 bg-app/80 backdrop-blur-lg border-b border-line">
         <div className="max-w-[1400px] mx-auto px-4 lg:px-6 h-14 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
-            <Logo size={28} />
+            <Link to="/" aria-label="Mo Tech home" className="rounded-lg">
+              <Logo size={28} />
+            </Link>
             <span aria-hidden="true" className="text-line-strong hidden sm:inline">/</span>
             <h1
               className="text-sm font-semibold hidden sm:block truncate"
