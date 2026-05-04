@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../firebase";
@@ -48,6 +49,12 @@ export default function Register() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const debounceRef = useRef(null);
+  // Set while a register/Google handler is mid-flight so the profile-check
+  // effect below doesn't observe `user` becoming non-null between
+  // createUser/signInWithPopup and claimInviteCode resolving — that race
+  // would briefly render the claim-only panel and let the user fire a
+  // concurrent claim from there.
+  const inFlightRegistrationRef = useRef(false);
 
   useEffect(() => {
     document.title = "Sign up — Mo Tech";
@@ -60,6 +67,10 @@ export default function Register() {
   // this page; if no, we'll surface the "claim-only" panel below.
   useEffect(() => {
     if (authLoading) return;
+    // Skip while a registration/Google handler is in flight; once the
+    // handler navigates or finally{} clears the ref + setLoading, the
+    // setLoading state change re-renders and re-runs this effect.
+    if (inFlightRegistrationRef.current) return;
     if (!user) {
       // Resets the lookup so a user who signs out and back in gets a fresh
       // check; the eslint rule below is fine to bypass because the assignment
@@ -79,7 +90,7 @@ export default function Register() {
     return () => {
       cancelled = true;
     };
-  }, [user, authLoading]);
+  }, [user, authLoading, loading]);
 
   // Already fully registered → bounce to the dashboard.
   useEffect(() => {
@@ -141,6 +152,7 @@ export default function Register() {
       toast.error("Password must be at least 6 characters");
       return;
     }
+    inFlightRegistrationRef.current = true;
     setLoading(true);
     let createdUser;
     try {
@@ -165,6 +177,7 @@ export default function Register() {
       }
       toast.error(err.message || "Failed to create account");
     } finally {
+      inFlightRegistrationRef.current = false;
       setLoading(false);
     }
   }
@@ -174,8 +187,26 @@ export default function Register() {
       toast.error("Enter a valid invite code first");
       return;
     }
+    inFlightRegistrationRef.current = true;
+    setLoading(true);
     try {
-      const signedInUser = await loginWithGoogle();
+      let signedInUser;
+      try {
+        signedInUser = await loginWithGoogle();
+      } catch (err) {
+        if (err.code === "auth/unauthorized-domain") {
+          toast.error(
+            "This domain is not authorized for Google sign-in. Add it in Firebase Console → Authentication → Settings → Authorized domains."
+          );
+        } else if (err.code === "auth/operation-not-allowed") {
+          toast.error(
+            "Google sign-in is not enabled. Enable it in Firebase Console → Authentication → Providers."
+          );
+        } else {
+          toast.error(err.message || "Google sign-in failed");
+        }
+        return;
+      }
       if (!signedInUser) return; // redirect flow
       try {
         await claimInviteCode({
@@ -190,18 +221,9 @@ export default function Register() {
         runCheck(inviteCode);
         toast.error(err.message || "Couldn't redeem invite code");
       }
-    } catch (err) {
-      if (err.code === "auth/unauthorized-domain") {
-        toast.error(
-          "This domain is not authorized for Google sign-in. Add it in Firebase Console → Authentication → Settings → Authorized domains."
-        );
-      } else if (err.code === "auth/operation-not-allowed") {
-        toast.error(
-          "Google sign-in is not enabled. Enable it in Firebase Console → Authentication → Providers."
-        );
-      } else {
-        toast.error(err.message || "Google sign-in failed");
-      }
+    } finally {
+      inFlightRegistrationRef.current = false;
+      setLoading(false);
     }
   }
 
@@ -259,8 +281,11 @@ export default function Register() {
       : undefined;
 
   // Loading state while we figure out whether the signed-in user already has
-  // a profile (avoids flashing the wrong panel).
-  if (authLoading || (user && hasProfile === null)) {
+  // a profile (avoids flashing the wrong panel). When `loading` is true a
+  // register/Google handler is in flight, so don't show the loading shell —
+  // keep rendering the form below where the submit/Google button shows its
+  // own spinner.
+  if (authLoading || (user && hasProfile === null && !loading)) {
     return (
       <AuthShell title="Loading…" subtitle="Checking your account…">
         <div className="flex justify-center py-6">
@@ -388,7 +413,8 @@ export default function Register() {
           className="w-full"
           leftIcon={<FcGoogle size={18} />}
           onClick={handleGoogle}
-          disabled={!inviteOk}
+          disabled={!inviteOk || loading}
+          loading={loading}
         >
           Continue with Google
         </Button>
