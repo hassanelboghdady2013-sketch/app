@@ -20,7 +20,7 @@ export default defineConfig([
   },
   {
     // Admin scripts run on Node; expose CommonJS + Node globals there.
-    files: ['scripts/**/*.js'],
+    files: ['scripts/**/*.{js,cjs}'],
     languageOptions: {
       globals: { ...globals.node },
       sourceType: 'commonjs',
