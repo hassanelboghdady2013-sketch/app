@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "../firebase";
 import { useAuth } from "../contexts/AuthContext";
 import toast from "react-hot-toast";
 import { FcGoogle } from "react-icons/fc";
-import { Eye, EyeOff, Check, X, Loader2, Ticket } from "lucide-react";
+import { Eye, EyeOff, Check, X, Loader2, Ticket, LogOut } from "lucide-react";
 import AuthShell from "../components/ui/AuthShell";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
@@ -40,6 +42,8 @@ export default function Register() {
   const [inviteStatus, setInviteStatus] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  // null = unknown, true = users/{uid} exists, false = signed in but no profile yet.
+  const [hasProfile, setHasProfile] = useState(null);
   const { user, loading: authLoading, register, loginWithGoogle, logout } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -51,18 +55,42 @@ export default function Register() {
 
   const needsInvite = searchParams.get("need-invite") === "1";
 
+  // Whenever the auth state changes, check whether this user already has a
+  // users/{uid} doc. If yes, they're fully registered and shouldn't be on
+  // this page; if no, we'll surface the "claim-only" panel below.
   useEffect(() => {
-    // Don't auto-redirect if we landed here because the user is signed in but
-    // hasn't claimed an invite code yet (ProtectedRoute redirected them with
-    // ?need-invite=1). Otherwise we'd loop between /dashboard and /register.
-    if (!authLoading && user && !needsInvite) {
+    if (authLoading) return;
+    if (!user) {
+      // Resets the lookup so a user who signs out and back in gets a fresh
+      // check; the eslint rule below is fine to bypass because the assignment
+      // only happens once per user transition.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setHasProfile(null);
+      return;
+    }
+    let cancelled = false;
+    getDoc(doc(db, "users", user.uid))
+      .then((snap) => {
+        if (!cancelled) setHasProfile(snap.exists());
+      })
+      .catch(() => {
+        if (!cancelled) setHasProfile(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user, authLoading]);
+
+  // Already fully registered → bounce to the dashboard.
+  useEffect(() => {
+    if (hasProfile === true) {
       navigate("/dashboard", { replace: true });
     }
-  }, [user, authLoading, navigate, needsInvite]);
+  }, [hasProfile, navigate]);
 
   useEffect(() => {
     if (needsInvite) {
-      toast.error("Please register with an invite code to access your dashboard.");
+      toast.error("Enter your invite code to finish creating your account.");
     }
   }, [needsInvite]);
 
@@ -133,7 +161,6 @@ export default function Register() {
         } catch {
           /* noop */
         }
-        // Re-check status so the UI reflects the new state.
         runCheck(inviteCode);
       }
       toast.error(err.message || "Failed to create account");
@@ -178,6 +205,43 @@ export default function Register() {
     }
   }
 
+  // Claim-only flow: the visitor is already authenticated (typically via
+  // Google sign-in on /login) but hasn't paired their account with an invite
+  // code yet. They just need to provide a code — no need to re-authenticate
+  // or pick a password.
+  async function handleClaimAuthed(e) {
+    e.preventDefault();
+    if (!user) return;
+    if (!inviteOk) {
+      toast.error("Please enter a valid invite code");
+      return;
+    }
+    setLoading(true);
+    try {
+      await claimInviteCode({
+        uid: user.uid,
+        email: user.email,
+        code: inviteCode,
+      });
+      toast.success("Welcome!");
+      navigate("/dashboard");
+    } catch (err) {
+      runCheck(inviteCode);
+      toast.error(err.message || "Couldn't redeem invite code");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSwitchAccount() {
+    try {
+      await logout();
+      toast.success("Signed out — you can pick a different account.");
+    } catch (err) {
+      toast.error(err.message || "Couldn't sign out");
+    }
+  }
+
   const strengthColor = ["bg-line-strong", "bg-danger", "bg-warning", "bg-warning", "bg-success", "bg-success"][strength.score];
 
   const inviteIcon = (() => {
@@ -193,6 +257,102 @@ export default function Register() {
     inviteStatus === "not-found" || inviteStatus === "claimed" || inviteStatus === "invalid"
       ? STATUS_HINTS[inviteStatus]
       : undefined;
+
+  // Loading state while we figure out whether the signed-in user already has
+  // a profile (avoids flashing the wrong panel).
+  if (authLoading || (user && hasProfile === null)) {
+    return (
+      <AuthShell title="Loading…" subtitle="Checking your account…">
+        <div className="flex justify-center py-6">
+          <div
+            className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin"
+            aria-label="Loading"
+          />
+        </div>
+      </AuthShell>
+    );
+  }
+
+  // Claim-only panel: signed in but no users/{uid} doc yet (i.e. they just
+  // logged in via Google for the first time). Skip email/password + the
+  // Google button — we already know who they are.
+  if (user && hasProfile === false) {
+    const photoURL = user.photoURL;
+    const displayName = user.displayName || user.email || "your account";
+    const initial = (user.displayName || user.email || "?").trim().charAt(0).toUpperCase();
+    return (
+      <AuthShell
+        title="One more step"
+        subtitle="Enter the invite code from your Mo Tech card to finish setting up your account."
+      >
+        <div className="flex items-center gap-3 p-3 mb-4 rounded-lg bg-card-hi border border-line">
+          {photoURL ? (
+            <img
+              src={photoURL}
+              alt=""
+              className="w-10 h-10 rounded-full object-cover"
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <div className="w-10 h-10 rounded-full bg-brand/15 text-brand grid place-items-center font-semibold">
+              {initial}
+            </div>
+          )}
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-medium text-fg truncate">
+              Signed in as {displayName}
+            </div>
+            {user.email && user.email !== displayName && (
+              <div className="text-xs text-muted truncate">{user.email}</div>
+            )}
+          </div>
+        </div>
+
+        <form onSubmit={handleClaimAuthed} className="space-y-4">
+          <Input
+            label={
+              <span className="inline-flex items-center gap-1.5">
+                <Ticket size={14} />
+                Invite code
+              </span>
+            }
+            value={inviteCode}
+            onChange={(e) => handleInviteChange(e.target.value)}
+            required
+            autoComplete="off"
+            placeholder="MOTECH-XXXX-XXXX"
+            hint={inviteError ? undefined : "From your NFC card or order confirmation."}
+            error={inviteError}
+            rightSlot={
+              <span className="w-8 h-8 grid place-items-center" aria-hidden="true">
+                {inviteIcon}
+              </span>
+            }
+          />
+          <Button
+            type="submit"
+            size="lg"
+            loading={loading}
+            className="w-full"
+            disabled={loading || !inviteOk}
+          >
+            {loading ? "Claiming…" : "Claim and continue"}
+          </Button>
+        </form>
+
+        <div className="mt-6 text-center">
+          <button
+            type="button"
+            onClick={handleSwitchAccount}
+            className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-fg transition-colors"
+          >
+            <LogOut size={14} />
+            Use a different account
+          </button>
+        </div>
+      </AuthShell>
+    );
+  }
 
   return (
     <AuthShell

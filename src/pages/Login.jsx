@@ -1,5 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "../firebase";
 import { useAuth } from "../contexts/AuthContext";
 import toast from "react-hot-toast";
 import { FcGoogle } from "react-icons/fc";
@@ -15,13 +17,18 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const { user, loading: authLoading, login, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
+  // Set while handleGoogle is running so the "already signed in → dashboard"
+  // effect below doesn't race with the in-flight users/{uid} check.
+  const handlingGoogleRef = useRef(false);
 
   useEffect(() => {
     document.title = "Log in — Mo Tech";
   }, []);
 
   useEffect(() => {
-    if (!authLoading && user) navigate("/dashboard", { replace: true });
+    if (!authLoading && user && !handlingGoogleRef.current) {
+      navigate("/dashboard", { replace: true });
+    }
   }, [user, authLoading, navigate]);
 
   async function handleSubmit(e) {
@@ -39,11 +46,19 @@ export default function Login() {
   }
 
   async function handleGoogle() {
+    handlingGoogleRef.current = true;
     try {
-      const result = await loginWithGoogle();
-      if (result) {
-        toast.success("Welcome!");
+      const signedInUser = await loginWithGoogle();
+      if (!signedInUser) return; // redirect flow
+      // First-time Google sign-in won't have a users/{uid} doc yet — send
+      // them straight to /register so they can claim an invite code without
+      // bouncing through /dashboard first.
+      const profileSnap = await getDoc(doc(db, "users", signedInUser.uid));
+      if (profileSnap.exists()) {
+        toast.success("Welcome back!");
         navigate("/dashboard");
+      } else {
+        navigate("/register?need-invite=1");
       }
     } catch (err) {
       if (err.code === "auth/unauthorized-domain") {
@@ -57,6 +72,7 @@ export default function Login() {
       } else {
         toast.error(err.message || "Google sign-in failed");
       }
+      handlingGoogleRef.current = false;
     }
   }
 
