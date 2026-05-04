@@ -67,6 +67,7 @@ export default function MobilePreview({ profile, links }) {
                   backgroundColor: cssVars["--theme-card-bg"] || "rgba(255,255,255,0.06)",
                   border: `1px solid ${cssVars["--theme-card-border"] || "rgba(255,255,255,0.1)"}`,
                   backdropFilter: cssVars["--theme-card-backdrop"] || "blur(12px)",
+                  boxShadow: cssVars["--theme-card-shadow"] || "none",
                 }}
               >
                 <Icon

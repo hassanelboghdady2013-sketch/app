@@ -156,10 +156,10 @@ const plans = [
 
 function PhoneMock() {
   const sampleLinks = [
-    { label: "Portfolio", color: "var(--color-brand)" },
-    { label: "LinkedIn", color: "var(--color-brand)" },
+    { label: "Portfolio", color: "#2563eb" },
+    { label: "LinkedIn", color: "#2563eb" },
     { label: "Instagram", color: "#ec4899" },
-    { label: "Email", color: "var(--color-success)" },
+    { label: "Email", color: "#10b981" },
   ];
   return (
     <div className="relative w-[260px] h-[520px] md:w-[280px] md:h-[560px] mx-auto">
