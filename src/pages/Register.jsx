@@ -92,12 +92,13 @@ export default function Register() {
     };
   }, [user, authLoading, loading]);
 
-  // Already fully registered → bounce to the dashboard.
-  useEffect(() => {
-    if (hasProfile === true) {
-      navigate("/dashboard", { replace: true });
-    }
-  }, [hasProfile, navigate]);
+  // Note: we intentionally no longer auto-redirect already-registered
+  // users away from /register. The Landing nav surfaces a "Get
+  // started" CTA that must remain functional even when a session
+  // already exists — for a card-owner showing the page to a friend
+  // beside them, or for switching between accounts. The "Already
+  // signed in" panel below offers a direct shortcut to the dashboard
+  // and a sign-out option that returns the form to its usable state.
 
   useEffect(() => {
     if (needsInvite) {
@@ -293,6 +294,68 @@ export default function Register() {
             className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin"
             aria-label="Loading"
           />
+        </div>
+      </AuthShell>
+    );
+  }
+
+  // Already-registered panel: signed in with a complete users/{uid}
+  // doc. Don't auto-redirect — give them a clear shortcut to the
+  // dashboard, plus a sign-out option so the registration form
+  // becomes usable for a fresh account.
+  if (user && hasProfile === true) {
+    const displayName = user.displayName || user.email || "your account";
+    const initial = (user.displayName || user.email || "?").trim().charAt(0).toUpperCase();
+    return (
+      <AuthShell
+        title="You're already signed in"
+        subtitle="Pick what you want to do next."
+      >
+        <div className="flex items-center gap-3 p-3 mb-5 rounded-lg bg-card-hi border border-line">
+          {user.photoURL ? (
+            <img
+              src={user.photoURL}
+              alt=""
+              className="w-10 h-10 rounded-full object-cover"
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <div className="w-10 h-10 rounded-full bg-brand/15 text-brand grid place-items-center font-semibold">
+              {initial}
+            </div>
+          )}
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-medium text-fg truncate">
+              {displayName}
+            </div>
+            {user.email && user.email !== displayName && (
+              <div className="text-xs text-muted truncate">{user.email}</div>
+            )}
+          </div>
+        </div>
+        <div className="space-y-2">
+          <Button
+            size="lg"
+            className="w-full"
+            onClick={() => navigate("/dashboard")}
+          >
+            Go to dashboard
+          </Button>
+          <Button
+            variant="outline"
+            size="lg"
+            className="w-full"
+            onClick={async () => {
+              try {
+                await logout();
+                toast.success("Signed out — you can register a new account.");
+              } catch {
+                toast.error("Couldn't sign out");
+              }
+            }}
+          >
+            Sign out and register a new account
+          </Button>
         </div>
       </AuthShell>
     );
