@@ -1,22 +1,24 @@
 import { useCallback, useRef, useState } from "react";
 import { Camera, Trash2, Loader2, Upload, ImageIcon } from "lucide-react";
-import {
-  ref,
-  uploadBytes,
-  getDownloadURL,
-  deleteObject,
-} from "firebase/storage";
 import toast from "react-hot-toast";
-import { storage } from "../../firebase";
 
-const MAX_BYTES = 4 * 1024 * 1024; // 4MB — well under the storage rule's 5MB cap.
+const MAX_BYTES = 4 * 1024 * 1024; // 4MB original-file cap.
 const ACCEPT = "image/jpeg,image/png,image/webp";
-// Square output size in pixels. 512 is sharp on retina avatars without
-// blowing up storage.
-const OUTPUT_SIZE = 512;
+// Square output size in pixels. 256 keeps the base64 well under
+// Firestore's 1MB document cap (typical encode is ~25–35 KB).
+const OUTPUT_SIZE = 256;
+// JPEG quality. 0.82 is a sweet spot where the file is small but
+// faces still look sharp at 256x256.
+const JPEG_QUALITY = 0.82;
+// Hard ceiling on the encoded data URL length. A 64KB string still
+// fits comfortably even with the rest of the profile doc, so this is
+// a safety net rather than the primary constraint.
+const MAX_DATA_URL_BYTES = 64 * 1024;
 
 /**
- * Read a file into a HTMLImageElement so we can resize/crop on a canvas.
+ * Read a file into an HTMLImageElement so we can resize/crop on a
+ * canvas. We only ever read the file as a data URL on disk locally —
+ * the Image's src is then revoked-by-replace when the function returns.
  */
 function readImage(file) {
   return new Promise((resolve, reject) => {
@@ -33,10 +35,16 @@ function readImage(file) {
 }
 
 /**
- * Center-crop the image to a square and downscale to OUTPUT_SIZE so we
- * don't push huge originals into Storage. Returns a JPEG Blob.
+ * Center-crop the image to a square, downscale to OUTPUT_SIZE, and
+ * encode as a JPEG data URL. Returns the data URL string, ready to be
+ * persisted directly into Firestore.
+ *
+ * We use a data URL (not a Blob → Storage URL) because the user has
+ * disabled Firebase Storage on this project — the avatar lives inline
+ * inside `profiles/{uid}.avatarUrl`. The downscale + quality combo
+ * targets ~25–35 KB encoded, well under Firestore's 1 MB doc cap.
  */
-async function cropAndDownscale(file) {
+async function cropAndEncode(file) {
   const img = await readImage(file);
   const minSide = Math.min(img.naturalWidth, img.naturalHeight);
   const sx = (img.naturalWidth - minSide) / 2;
@@ -47,20 +55,23 @@ async function cropAndDownscale(file) {
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Canvas not supported in this browser");
   ctx.drawImage(img, sx, sy, minSide, minSide, 0, 0, OUTPUT_SIZE, OUTPUT_SIZE);
-  return new Promise((resolve, reject) => {
-    canvas.toBlob(
-      (blob) => (blob ? resolve(blob) : reject(new Error("Image encode failed"))),
-      "image/jpeg",
-      0.9
+  const dataUrl = canvas.toDataURL("image/jpeg", JPEG_QUALITY);
+  if (dataUrl.length > MAX_DATA_URL_BYTES) {
+    // Extremely high-frequency / noisy image that JPEG can't compress
+    // small enough. Should be rare at 256x256 + q0.82, but if it
+    // happens we want a clear error rather than a Firestore write
+    // failure.
+    throw new Error(
+      "Image is too detailed to compress small enough — try a simpler photo."
     );
-  });
+  }
+  return dataUrl;
 }
 
 /**
- * Friendly avatar picker — click the circle, pick a file, see a preview,
- * upload to Firebase Storage at /avatars/{uid}/avatar.jpg, and call
- * `onChange(url)` with the public download URL. Falls through gracefully
- * on cancel/error.
+ * Friendly avatar picker — click the circle, pick a file, see a
+ * preview, encode locally, and call `onChange(dataUrl)` so the parent
+ * can persist it directly to Firestore. No Firebase Storage is used.
  */
 export default function AvatarUploader({
   uid,
@@ -71,8 +82,8 @@ export default function AvatarUploader({
 }) {
   const inputRef = useRef(null);
   const [busy, setBusy] = useState(false);
-  // Local optimistic preview (data: URL) shown the instant the user picks
-  // a file, before the upload finishes.
+  // Local preview shown while the parent's Firestore write is in
+  // flight. Once `value` updates we show that instead.
   const [preview, setPreview] = useState("");
 
   const pick = useCallback(() => {
@@ -92,36 +103,23 @@ export default function AvatarUploader({
         return;
       }
       setBusy(true);
-      // Hoisted out of the try so we can revoke it from `catch` /
-      // `finally` even when the storage call below throws.
-      let localUrl = null;
       try {
-        const blob = await cropAndDownscale(file);
-        // Show optimistic preview immediately.
-        localUrl = URL.createObjectURL(blob);
-        setPreview(localUrl);
-        // Stable filename so a new upload overwrites the previous file
-        // (no orphaned avatars accumulating in Storage).
-        const path = `avatars/${uid}/avatar.jpg`;
-        const storageRef = ref(storage, path);
-        await uploadBytes(storageRef, blob, {
-          contentType: "image/jpeg",
-          // Force a fresh fetch each upload — otherwise CDNs/browsers
-          // would serve the previous photo from cache.
-          cacheControl: "public, max-age=60",
-        });
-        const url = await getDownloadURL(storageRef);
-        // The parent persists this URL to Firestore. We await so any
-        // persistence error surfaces as the toast below instead of
-        // leaving Storage and Firestore out of sync.
-        await Promise.resolve(onChange(url));
+        const dataUrl = await cropAndEncode(file);
+        // Show the encoded image instantly. Same image goes to the
+        // parent for persistence; once the parent's `value` updates we
+        // can clear the local preview without a flicker.
+        setPreview(dataUrl);
+        // Awaiting lets us surface the parent's persistence error as
+        // the toast below — without await, a Firestore write failure
+        // would silently produce a stale preview + a stale "saved"
+        // state.
+        await Promise.resolve(onChange(dataUrl));
         setPreview("");
         toast.success("Photo updated");
       } catch (err) {
         toast.error(err.message || "Upload failed");
         setPreview("");
       } finally {
-        if (localUrl) URL.revokeObjectURL(localUrl);
         setBusy(false);
       }
     },
@@ -132,18 +130,10 @@ export default function AvatarUploader({
     if (!uid || disabled || busy) return;
     setBusy(true);
     try {
-      // Clear Firestore *first* so it never points to a deleted Storage
-      // object — if the storage delete below fails for any reason, we
-      // just leave an orphan we can sweep later (vs. a broken <img>).
+      // Clearing the data URL = clearing the avatar. There's nothing
+      // out-of-band to delete (no Storage object), so this is just a
+      // single Firestore field update.
       await Promise.resolve(onChange(""));
-      // Best-effort: the object may not exist if the previous avatar
-      // lived somewhere else (e.g. a Google profile photo URL). Ignore
-      // "not found" errors silently.
-      try {
-        await deleteObject(ref(storage, `avatars/${uid}/avatar.jpg`));
-      } catch (err) {
-        if (err?.code !== "storage/object-not-found") throw err;
-      }
       setPreview("");
       toast.success("Photo removed");
     } catch (err) {

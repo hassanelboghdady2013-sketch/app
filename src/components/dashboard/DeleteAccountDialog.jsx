@@ -9,7 +9,6 @@ import Button from "../ui/Button";
 import Input from "../ui/Input";
 
 const STAGE_LABELS = {
-  avatar: "Removing your photo…",
   links: "Removing your links…",
   profile: "Removing your profile…",
   username: "Releasing your username…",
@@ -84,7 +83,11 @@ export default function DeleteAccountDialog({
     } catch (err) {
       const code = err?.code || "";
       const friendly =
-        code === "auth/wrong-password"
+        // Firebase 12.x collapses most credential failures into
+        // `auth/invalid-credential`. The legacy `auth/wrong-password`
+        // string is kept as a belt-and-braces match in case Firebase
+        // ever splits them again or this file gets back-ported.
+        code === "auth/wrong-password" || code === "auth/invalid-credential"
           ? "That password didn't match."
           : code === "auth/popup-closed-by-browser"
           ? "Sign-in popup was closed before we could verify it."
