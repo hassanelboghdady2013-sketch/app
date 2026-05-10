@@ -34,7 +34,11 @@ import {
   EyeOff,
   Link2,
 } from "lucide-react";
-import platforms, { getPlatform } from "../../lib/platforms";
+import platforms, {
+  getPlatform,
+  buildLinkUrl,
+  extractLinkValue,
+} from "../../lib/platforms";
 import ConfirmDialog from "../../components/ui/ConfirmDialog";
 import SkeletonLoader from "../../components/ui/SkeletonLoader";
 import Button from "../../components/ui/Button";
@@ -80,7 +84,9 @@ function SortableLink({ link, onEdit, onDelete, onToggle }) {
         <p className="text-sm font-medium truncate">
           {link.title || platform.label}
         </p>
-        <p className="text-xs text-muted truncate">{link.url}</p>
+        <p className="text-xs text-muted truncate">
+          {extractLinkValue(link.platform, link.url)}
+        </p>
       </div>
       <div className="flex items-center gap-0.5">
         <IconButton
@@ -164,30 +170,62 @@ export default function LinksSection() {
 
   function openEditForm(link) {
     setEditingLink(link);
-    setForm({ platform: link.platform, title: link.title, url: link.url });
+    // For phone/email links the stored value has a `tel:` / `mailto:`
+    // prefix; strip it so the user sees just their number/email when
+    // editing.
+    setForm({
+      platform: link.platform,
+      title: link.title,
+      url: extractLinkValue(link.platform, link.url),
+    });
     setShowForm(true);
   }
 
   async function handleSave() {
-    if (!form.url.trim()) {
-      toast.error("URL is required");
+    const platform = getPlatform(form.platform);
+    const raw = form.url.trim();
+    if (!raw) {
+      toast.error(
+        platform.inputMode === "email"
+          ? "Email is required"
+          : platform.inputMode === "tel"
+          ? "Phone number is required"
+          : "URL is required"
+      );
       return;
     }
+    if (platform.inputMode === "email") {
+      const stripped = raw.replace(/^mailto:/i, "");
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(stripped)) {
+        toast.error("Enter a valid email address");
+        return;
+      }
+    } else if (platform.inputMode === "tel") {
+      const stripped = raw.replace(/^tel:/i, "").replace(/[^\d+]/g, "");
+      // Allow at least 5 digits (very loose) so we don't reject valid
+      // international numbers; the tel: URI on the public profile will
+      // dial whatever the user typed.
+      if (!/^\+?\d{5,}$/.test(stripped)) {
+        toast.error("Enter a valid phone number");
+        return;
+      }
+    }
+    const url = buildLinkUrl(form.platform, raw);
     setSaving(true);
     try {
       if (editingLink) {
         await updateDoc(doc(db, "links", editingLink.id), {
           platform: form.platform,
-          title: form.title || getPlatform(form.platform).label,
-          url: form.url,
+          title: form.title || platform.label,
+          url,
         });
         toast.success("Link updated");
       } else {
         await addDoc(collection(db, "links"), {
           uid: user.uid,
           platform: form.platform,
-          title: form.title || getPlatform(form.platform).label,
-          url: form.url,
+          title: form.title || platform.label,
+          url,
           iconSlug: form.platform,
           order: links.length,
           active: true,
@@ -263,7 +301,20 @@ export default function LinksSection() {
           <Select
             label="Platform"
             value={form.platform}
-            onChange={(e) => setForm((f) => ({ ...f, platform: e.target.value }))}
+            onChange={(e) => {
+              const next = e.target.value;
+              const prev = getPlatform(form.platform);
+              const nextPlatform = getPlatform(next);
+              // When switching between url-mode and tel/email-mode, clear
+              // the value field so we don't carry a half-formed value
+              // (e.g. an email when the user just switched to LinkedIn).
+              const clear = (prev.inputMode || "url") !== (nextPlatform.inputMode || "url");
+              setForm((f) => ({
+                ...f,
+                platform: next,
+                url: clear ? "" : f.url,
+              }));
+            }}
           >
             {platforms.map((p) => (
               <option key={p.id} value={p.id}>
@@ -277,12 +328,36 @@ export default function LinksSection() {
             onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
             placeholder={getPlatform(form.platform).label}
           />
-          <Input
-            label="URL"
-            value={form.url}
-            onChange={(e) => setForm((f) => ({ ...f, url: e.target.value }))}
-            placeholder={getPlatform(form.platform).placeholder}
-          />
+          {(() => {
+            const p = getPlatform(form.platform);
+            const mode = p.inputMode || "url";
+            const label =
+              mode === "email"
+                ? "Email address"
+                : mode === "tel"
+                ? "Phone number"
+                : "URL";
+            const hint =
+              mode === "email"
+                ? "Just the email — we'll add the mailto: link automatically."
+                : mode === "tel"
+                ? "Just the number — we'll make it tappable to call automatically."
+                : undefined;
+            return (
+              <Input
+                label={label}
+                type={mode === "email" ? "email" : mode === "tel" ? "tel" : "url"}
+                inputMode={mode === "tel" ? "tel" : undefined}
+                autoComplete={
+                  mode === "email" ? "email" : mode === "tel" ? "tel" : "off"
+                }
+                value={form.url}
+                onChange={(e) => setForm((f) => ({ ...f, url: e.target.value }))}
+                placeholder={p.placeholder}
+                hint={hint}
+              />
+            );
+          })()}
           <div className="flex gap-3 pt-1">
             <Button onClick={handleSave} loading={saving}>
               {editingLink ? "Save changes" : "Add link"}
