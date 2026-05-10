@@ -21,6 +21,7 @@ import {
   X,
   ChevronDown,
   Ticket,
+  CreditCard,
 } from "lucide-react";
 import MobilePreview from "../../components/dashboard/MobilePreview";
 import Logo from "../../components/ui/Logo";
@@ -31,6 +32,7 @@ import toast from "react-hot-toast";
 const navItems = [
   { to: "/dashboard/profile", icon: User, label: "Profile" },
   { to: "/dashboard/links", icon: Link2, label: "Links" },
+  { to: "/dashboard/card", icon: CreditCard, label: "Card" },
   { to: "/dashboard/appearance", icon: Palette, label: "Appearance" },
   { to: "/dashboard/analytics", icon: BarChart3, label: "Analytics" },
 ];
