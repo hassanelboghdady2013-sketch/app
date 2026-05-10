@@ -9,6 +9,7 @@ import Register from "./pages/Register";
 import DashboardLayout from "./pages/dashboard/DashboardLayout";
 import ProfileSection from "./pages/dashboard/ProfileSection";
 import LinksSection from "./pages/dashboard/LinksSection";
+import CardSection from "./pages/dashboard/CardSection";
 import AppearanceSection from "./pages/dashboard/AppearanceSection";
 import AnalyticsSection from "./pages/dashboard/AnalyticsSection";
 import AdminCodes from "./pages/admin/AdminCodes";
@@ -48,6 +49,7 @@ export default function App() {
             <Route index element={<Navigate to="profile" replace />} />
             <Route path="profile" element={<ProfileSection />} />
             <Route path="links" element={<LinksSection />} />
+            <Route path="card" element={<CardSection />} />
             <Route path="appearance" element={<AppearanceSection />} />
             <Route path="analytics" element={<AnalyticsSection />} />
           </Route>

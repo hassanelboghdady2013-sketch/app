@@ -21,6 +21,7 @@ import {
   X,
   ChevronDown,
   Ticket,
+  CreditCard,
 } from "lucide-react";
 import MobilePreview from "../../components/dashboard/MobilePreview";
 import Logo from "../../components/ui/Logo";
@@ -31,6 +32,7 @@ import toast from "react-hot-toast";
 const navItems = [
   { to: "/dashboard/profile", icon: User, label: "Profile" },
   { to: "/dashboard/links", icon: Link2, label: "Links" },
+  { to: "/dashboard/card", icon: CreditCard, label: "Card" },
   { to: "/dashboard/appearance", icon: Palette, label: "Appearance" },
   { to: "/dashboard/analytics", icon: BarChart3, label: "Analytics" },
 ];
@@ -321,7 +323,7 @@ export default function DashboardLayout() {
         aria-label="Sections"
         className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-app/95 backdrop-blur-lg border-t border-line"
       >
-        <div className="max-w-md mx-auto px-2 grid grid-cols-4">
+        <div className="max-w-md mx-auto px-2 grid grid-cols-5">
           {navItems.map(({ to, icon: Icon, label }) => (
             <NavLink
               key={to}
