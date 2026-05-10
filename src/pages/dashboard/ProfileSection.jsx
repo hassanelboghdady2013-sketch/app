@@ -9,7 +9,6 @@ import {
   QrCode,
   Copy,
   Share2,
-  ImageIcon,
   ExternalLink,
   Download,
 } from "lucide-react";
@@ -22,6 +21,7 @@ import Input from "../../components/ui/Input";
 import Textarea from "../../components/ui/Textarea";
 import Card from "../../components/ui/Card";
 import IconButton from "../../components/ui/IconButton";
+import AvatarUploader from "../../components/dashboard/AvatarUploader";
 
 const NAME_MAX = 60;
 const TITLE_MAX = 80;
@@ -40,7 +40,6 @@ export default function ProfileSection() {
     bio: "",
   });
   const [avatarUrl, setAvatarUrl] = useState("");
-  const [avatarError, setAvatarError] = useState("");
   const [saving, setSaving] = useState(false);
   const [usernameStatus, setUsernameStatus] = useState(null);
   const [showQR, setShowQR] = useState(false);
@@ -112,24 +111,28 @@ export default function ProfileSection() {
     }, 300);
   }, []);
 
-  function handleAvatarChange(url) {
-    setAvatarUrl(url);
-    setAvatarError("");
-    if (!url) return;
-    try {
-      const parsed = new URL(url);
-      if (!["http:", "https:"].includes(parsed.protocol)) {
-        setAvatarError("URL must use http or https");
-        return;
-      }
-    } catch {
-      setAvatarError("Enter a valid URL");
-      return;
-    }
-    const img = new Image();
-    img.onload = () => setAvatarError("");
-    img.onerror = () => setAvatarError("Could not load image from this URL");
-    img.src = url;
+  // Avatar changes persist *immediately* to Firestore — we don't fold
+  // them into the deferred Save flow because the AvatarUploader has
+  // already mutated Storage (uploaded a new file, or deleted the old
+  // one) by the time it calls us. Storing eagerly keeps Firestore and
+  // Storage in sync; otherwise a Discard click would leave Firestore
+  // pointing at a Storage object that no longer matches.
+  //
+  // Errors propagate up to AvatarUploader so it can show its own toast
+  // and skip its success path; we deliberately don't toast here to
+  // avoid showing two error messages for the same failure.
+  async function handleAvatarChange(url) {
+    if (!user?.uid) return;
+    const next = url || "";
+    setAvatarUrl(next);
+    await setDoc(
+      doc(db, "profiles", user.uid),
+      { avatarUrl: next, updatedAt: serverTimestamp() },
+      { merge: true }
+    );
+    // Keep dirty-tracking in sync so the Save bar doesn't surface
+    // "unsaved changes" purely because the avatar changed.
+    setInitialState((prev) => (prev ? { ...prev, avatarUrl: next } : prev));
   }
 
   function handleChange(field, value) {
@@ -145,10 +148,6 @@ export default function ProfileSection() {
       usernameStatus === "checking"
     ) {
       toast.error("Please fix username before saving");
-      return;
-    }
-    if (avatarError) {
-      toast.error("Please fix avatar URL before saving");
       return;
     }
     setSaving(true);
@@ -199,7 +198,6 @@ export default function ProfileSection() {
       bio: initialState.bio,
     });
     setAvatarUrl(initialState.avatarUrl);
-    setAvatarError("");
   }
 
   const profileUrl = form.username
@@ -269,29 +267,12 @@ export default function ProfileSection() {
 
       {/* Avatar + identity */}
       <Card padding="lg" className="mb-6">
-        <div className="flex items-center gap-5">
-          <div className="relative">
-            {avatarUrl && !avatarError ? (
-              <img
-                src={avatarUrl}
-                alt=""
-                className="w-20 h-20 rounded-full object-cover ring-2 ring-line-strong"
-              />
-            ) : (
-              <div className="w-20 h-20 rounded-full bg-brand-soft text-brand grid place-items-center text-2xl font-bold ring-2 ring-line-strong">
-                {(form.name || user?.email || "?").charAt(0).toUpperCase()}
-              </div>
-            )}
-          </div>
-          <div className="min-w-0">
-            <p className="font-semibold text-lg truncate">
-              {form.name || "Your name"}
-            </p>
-            <p className="text-sm text-muted truncate">
-              {form.title || "Add a title"}
-            </p>
-          </div>
-        </div>
+        <AvatarUploader
+          uid={user?.uid}
+          value={avatarUrl}
+          fallbackLetter={(form.name || user?.email || "?").charAt(0).toUpperCase()}
+          onChange={handleAvatarChange}
+        />
       </Card>
 
       {/* URL + actions */}
@@ -413,23 +394,6 @@ export default function ProfileSection() {
           placeholder="Tell people about yourself…"
         />
 
-        <Input
-          label={
-            <span className="inline-flex items-center gap-1.5">
-              <ImageIcon size={14} />
-              Avatar URL
-            </span>
-          }
-          value={avatarUrl}
-          onChange={(e) => handleAvatarChange(e.target.value)}
-          placeholder="https://example.com/your-photo.jpg"
-          hint={
-            avatarError
-              ? undefined
-              : "Paste a direct link to your profile photo (jpg/png/webp)."
-          }
-          error={avatarError || undefined}
-        />
       </div>
 
       {/* Sticky save bar */}
