@@ -70,10 +70,18 @@ export default function MobilePreview({ profile, links }) {
                   boxShadow: cssVars["--theme-card-shadow"] || "none",
                 }}
               >
-                <Icon
-                  size={14}
-                  style={{ color: cssVars["--theme-accent"] || "var(--color-brand)" }}
-                />
+                {link.iconUrl ? (
+                  <img
+                    src={link.iconUrl}
+                    alt=""
+                    className="w-3.5 h-3.5 rounded object-cover shrink-0"
+                  />
+                ) : (
+                  <Icon
+                    size={14}
+                    style={{ color: cssVars["--theme-accent"] || "var(--color-brand)" }}
+                  />
+                )}
                 <span className="flex-1 truncate">{link.title || platform.label}</span>
                 <span aria-hidden="true" className="opacity-40 text-[10px]">
                   →
