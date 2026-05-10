@@ -12,6 +12,7 @@ import {
   ImageIcon,
   ExternalLink,
   Download,
+  Wifi,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import reservedUsernames from "../../lib/reservedUsernames";
@@ -22,6 +23,7 @@ import Input from "../../components/ui/Input";
 import Textarea from "../../components/ui/Textarea";
 import Card from "../../components/ui/Card";
 import IconButton from "../../components/ui/IconButton";
+import NfcProgramDialog from "../../components/dashboard/NfcProgramDialog";
 
 const NAME_MAX = 60;
 const TITLE_MAX = 80;
@@ -44,6 +46,7 @@ export default function ProfileSection() {
   const [saving, setSaving] = useState(false);
   const [usernameStatus, setUsernameStatus] = useState(null);
   const [showQR, setShowQR] = useState(false);
+  const [showNfc, setShowNfc] = useState(false);
   const [copied, setCopied] = useState(false);
   const [initialState, setInitialState] = useState(null);
   // Profile is null until the auth + Firestore snapshot resolve; for brand-new
@@ -333,6 +336,13 @@ export default function ProfileSection() {
             >
               <QrCode size={16} />
             </IconButton>
+            <IconButton
+              aria-label="Program NFC card"
+              onClick={() => setShowNfc(true)}
+              title="Program NFC card"
+            >
+              <Wifi size={16} />
+            </IconButton>
           </div>
           {showQR && (
             <div className="mt-4 flex flex-col items-center gap-3 p-5 bg-white rounded-xl">
@@ -349,6 +359,13 @@ export default function ProfileSection() {
             </div>
           )}
         </Card>
+      )}
+
+      {showNfc && profileUrl && (
+        <NfcProgramDialog
+          url={profileUrl}
+          onClose={() => setShowNfc(false)}
+        />
       )}
 
       {/* Form */}
