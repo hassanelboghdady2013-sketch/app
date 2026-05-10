@@ -13,7 +13,12 @@ service cloud.firestore {
     }
 
     match /users/{uid} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+      // Admins can read any user doc so the /admin/codes page can resolve
+      // a code's claimer to an email address. Writes are still restricted to
+      // the owner.
+      allow read: if request.auth != null
+        && (request.auth.uid == uid || isAdmin());
+      allow write: if request.auth != null && request.auth.uid == uid;
     }
 
     // Admin role is just a presence-check on this collection. Bootstrap the
@@ -67,10 +72,16 @@ service cloud.firestore {
       allow update: if request.auth != null
         && (!("claimedBy" in resource.data) || resource.data.claimedBy == null)
         && request.resource.data.claimedBy == request.auth.uid
+        // claimedEmail is optional, but if set it must match the caller's
+        // own auth token email — prevents tagging a code with someone
+        // else's address.
+        && (!("claimedEmail" in request.resource.data)
+            || request.resource.data.claimedEmail == null
+            || request.resource.data.claimedEmail == request.auth.token.email)
         && request.resource.data
             .diff(resource.data)
             .affectedKeys()
-            .hasOnly(["claimedBy", "claimedAt"]);
+            .hasOnly(["claimedBy", "claimedAt", "claimedEmail"]);
       allow delete: if isAdmin()
         && (!("claimedBy" in resource.data) || resource.data.claimedBy == null);
     }
