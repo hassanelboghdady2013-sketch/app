@@ -117,25 +117,22 @@ export default function ProfileSection() {
   // one) by the time it calls us. Storing eagerly keeps Firestore and
   // Storage in sync; otherwise a Discard click would leave Firestore
   // pointing at a Storage object that no longer matches.
+  //
+  // Errors propagate up to AvatarUploader so it can show its own toast
+  // and skip its success path; we deliberately don't toast here to
+  // avoid showing two error messages for the same failure.
   async function handleAvatarChange(url) {
     if (!user?.uid) return;
     const next = url || "";
     setAvatarUrl(next);
-    try {
-      await setDoc(
-        doc(db, "profiles", user.uid),
-        { avatarUrl: next, updatedAt: serverTimestamp() },
-        { merge: true }
-      );
-      // Keep dirty-tracking in sync so the Save bar doesn't surface
-      // "unsaved changes" purely because the avatar changed.
-      setInitialState((prev) => (prev ? { ...prev, avatarUrl: next } : prev));
-    } catch (err) {
-      toast.error(err.message || "Couldn't save photo");
-      // Re-throw so AvatarUploader's catch can show its own toast and
-      // skip its success path.
-      throw err;
-    }
+    await setDoc(
+      doc(db, "profiles", user.uid),
+      { avatarUrl: next, updatedAt: serverTimestamp() },
+      { merge: true }
+    );
+    // Keep dirty-tracking in sync so the Save bar doesn't surface
+    // "unsaved changes" purely because the avatar changed.
+    setInitialState((prev) => (prev ? { ...prev, avatarUrl: next } : prev));
   }
 
   function handleChange(field, value) {
