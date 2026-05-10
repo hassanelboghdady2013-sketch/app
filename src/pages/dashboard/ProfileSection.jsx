@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useOutletContext } from "react-router-dom";
+import { useOutletContext, useNavigate } from "react-router-dom";
 import { doc, setDoc, getDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../../firebase";
 import {
@@ -11,6 +11,8 @@ import {
   Share2,
   ExternalLink,
   Download,
+  Trash2,
+  AlertTriangle,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import reservedUsernames from "../../lib/reservedUsernames";
@@ -22,6 +24,7 @@ import Textarea from "../../components/ui/Textarea";
 import Card from "../../components/ui/Card";
 import IconButton from "../../components/ui/IconButton";
 import AvatarUploader from "../../components/dashboard/AvatarUploader";
+import DeleteAccountDialog from "../../components/dashboard/DeleteAccountDialog";
 
 const NAME_MAX = 60;
 const TITLE_MAX = 80;
@@ -33,6 +36,8 @@ function deepEqual(a, b) {
 
 export default function ProfileSection() {
   const { user, profile } = useOutletContext();
+  const navigate = useNavigate();
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [form, setForm] = useState({
     name: "",
     username: "",
@@ -395,6 +400,46 @@ export default function ProfileSection() {
         />
 
       </div>
+
+      {/* Danger zone */}
+      <Card padding="lg" className="mt-10 border-danger/30 bg-danger/[0.04]">
+        <div className="flex items-start gap-3 mb-3">
+          <span className="grid place-items-center w-9 h-9 rounded-lg bg-danger/15 text-danger shrink-0">
+            <AlertTriangle size={16} />
+          </span>
+          <div>
+            <h3 className="text-sm font-semibold text-fg">Danger zone</h3>
+            <p className="text-xs text-muted mt-0.5">
+              Permanently remove your profile, links, and sign-in. This cannot
+              be undone.
+            </p>
+          </div>
+        </div>
+        <Button
+          variant="danger"
+          size="md"
+          leftIcon={<Trash2 size={14} />}
+          onClick={() => setShowDeleteDialog(true)}
+        >
+          Delete my account
+        </Button>
+      </Card>
+
+      {showDeleteDialog && (
+        <DeleteAccountDialog
+          user={user}
+          username={profile?.username || form.username || ""}
+          onClose={() => setShowDeleteDialog(false)}
+          onCompleted={() => {
+            setShowDeleteDialog(false);
+            // The auth user is gone at this point; navigate to landing
+            // and onAuthStateChanged in AuthContext will push us to a
+            // signed-out state.
+            navigate("/", { replace: true });
+            toast.success("Account deleted");
+          }}
+        />
+      )}
 
       {/* Sticky save bar */}
       <div
