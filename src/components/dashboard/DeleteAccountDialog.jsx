@@ -72,9 +72,15 @@ export default function DeleteAccountDialog({
     try {
       await reauthenticate(user, { password });
       await deleteAccountData(user, (s) => setStage(s));
-      // Brief pause on the final stage so the user sees "Done" before
-      // we redirect them to the landing page.
-      setTimeout(() => onCompleted?.(), 600);
+      // Navigate synchronously the moment the cascade resolves —
+      // user.delete() has already fired, so onAuthStateChanged(null)
+      // is queued. If we delay, ProtectedRoute redirects to /login
+      // before our redirect to / runs, and the user briefly sees the
+      // login page on the way out. Calling navigate first wins the
+      // race because '/' renders the Landing page (outside the
+      // ProtectedRoute subtree) so the auth-null state has nothing to
+      // bounce on.
+      onCompleted?.();
     } catch (err) {
       const code = err?.code || "";
       const friendly =
