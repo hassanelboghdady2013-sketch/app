@@ -32,10 +32,14 @@ export function detectPlatformHint() {
  *     `NotAllowedError`.
  *   - If the card is read-only, the write throws `NotSupportedError`
  *     or similar — we surface a friendly message either way.
- *   - `NDEFReader.write` writes one record by default; passing a string
- *     creates a URL record automatically. We pass `{ overwrite: true }`
- *     so previously-written tags get reprogrammed without a separate
- *     "erase first" step.
+ *   - `NDEFReader.write` defaults a bare string to a *text* record
+ *     (NDEF type "T"), which Android's tag handler does NOT
+ *     auto-launch as a URL — the user would have to long-press the
+ *     notification. So we explicitly construct a URL record
+ *     (NDEF type "U") via `{ records: [{ recordType: "url", data }] }`,
+ *     which Android opens in the default browser on tap. We pass
+ *     `{ overwrite: true }` so previously-written tags get
+ *     reprogrammed without a separate "erase first" step.
  *
  * `signal` (optional) is an AbortSignal — pass one if you want the
  * caller's cancel button to bail out the write.
@@ -50,7 +54,10 @@ export async function writeUrlToTag(url, { signal } = {}) {
   // eslint-disable-next-line no-undef
   const ndef = new NDEFReader();
   try {
-    await ndef.write(url, { overwrite: true, signal });
+    await ndef.write(
+      { records: [{ recordType: "url", data: url }] },
+      { overwrite: true, signal }
+    );
   } catch (err) {
     throw friendlyNfcError(err);
   }
