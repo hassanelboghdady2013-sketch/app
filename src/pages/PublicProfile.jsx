@@ -19,6 +19,54 @@ import { QRCodeSVG } from "qrcode.react";
 import SkeletonLoader from "../components/ui/SkeletonLoader";
 import toast, { Toaster } from "react-hot-toast";
 
+/**
+ * Fold a long content line per RFC 2426 §2.6: max 75 octets per line,
+ * continuation lines are prefixed with a single space (or tab). We
+ * count chars conservatively as octets — fine here because the input
+ * is base64 ASCII.
+ */
+function foldVcardLine(line) {
+  if (line.length <= 75) return [line];
+  const out = [line.slice(0, 75)];
+  let i = 75;
+  while (i < line.length) {
+    out.push(" " + line.slice(i, i + 74));
+    i += 74;
+  }
+  return out;
+}
+
+/**
+ * Turn an `avatarUrl` field into the lines it should produce inside
+ * the vCard. Returns an array of strings (zero, one, or many lines
+ * for the folded base64 case).
+ *
+ *   - data:image/<type>;base64,<data> -> `PHOTO;ENCODING=b;TYPE=<TYPE>:<data>`
+ *     folded at 75 octets. Strips the data: prefix because vCard
+ *     readers (iOS Contacts, Android Contacts, Outlook) expect raw
+ *     base64 here, not a `data:` URL.
+ *   - http(s):// URLs -> single `PHOTO;VALUE=uri:<url>` line.
+ *   - falsy/unsupported -> `[]` so the PHOTO line gets omitted.
+ */
+function buildVcardPhoto(avatarUrl) {
+  if (!avatarUrl) return [];
+  const dataMatch = /^data:image\/([a-zA-Z0-9.+-]+);base64,(.+)$/.exec(avatarUrl);
+  if (dataMatch) {
+    const mimeSubtype = dataMatch[1].toUpperCase();
+    // vCard 3.0 uses TYPE=JPEG / TYPE=PNG (the subtype, uppercased).
+    // Map the canvas-emitted "jpeg" through cleanly.
+    const type = mimeSubtype === "JPEG" ? "JPEG" : mimeSubtype;
+    const base64 = dataMatch[2];
+    return foldVcardLine(`PHOTO;ENCODING=b;TYPE=${type}:${base64}`);
+  }
+  if (/^https?:\/\//i.test(avatarUrl)) {
+    return [`PHOTO;VALUE=uri:${avatarUrl}`];
+  }
+  // Any other shape (relative path, blob:, javascript:, etc.) is
+  // safer to omit than to emit something a parser will choke on.
+  return [];
+}
+
 export default function PublicProfile() {
   const { username } = useParams();
   const [profile, setProfile] = useState(null);
@@ -118,6 +166,25 @@ export default function PublicProfile() {
     const phone = phoneLink?.url?.replace("tel:", "") || "";
     const website = websiteLink?.url || `${window.location.origin}/${username}`;
 
+    // Build the PHOTO line. Two shapes depending on what the avatar
+    // string actually is:
+    //
+    //   - data: URL  -> emit `PHOTO;ENCODING=b;TYPE=JPEG:<base64>`
+    //     and fold lines at 75 octets per RFC 2426 §2.6. Stuffing a
+    //     30+ KB data URL into a `PHOTO;VALUE=uri:` line produces a
+    //     single multi-thousand-char line that iOS Contacts /
+    //     Android Contacts / Outlook all reject (or silently strip
+    //     the photo from). The encoded form below is what Apple and
+    //     Google's own exporters use for inline images.
+    //
+    //   - https URL  -> short, fits on one line, the standard
+    //     `PHOTO;VALUE=uri:<https-url>` form is correct. Legacy
+    //     users whose avatarUrl still points at
+    //     firebasestorage.googleapis.com fall through this branch.
+    //
+    // `null` means no avatar field at all, which is also fine.
+    const photoLines = buildVcardPhoto(profile.avatarUrl);
+
     const vcf = [
       "BEGIN:VCARD",
       "VERSION:3.0",
@@ -126,11 +193,11 @@ export default function PublicProfile() {
       email ? `EMAIL:${email}` : "",
       phone ? `TEL:${phone}` : "",
       `URL:${website}`,
-      profile.avatarUrl ? `PHOTO;VALUE=uri:${profile.avatarUrl}` : "",
+      ...photoLines,
       "END:VCARD",
     ]
       .filter(Boolean)
-      .join("\n");
+      .join("\r\n");
 
     const blob = new Blob([vcf], { type: "text/vcard" });
     const url = URL.createObjectURL(blob);
