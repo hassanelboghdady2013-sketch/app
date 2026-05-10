@@ -17,6 +17,7 @@ import { getThemeCSS } from "../lib/themes";
 import { Share2, Download, ChevronRight, Copy, Check, QrCode } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import SkeletonLoader from "../components/ui/SkeletonLoader";
+import { downloadQrAsPng } from "../lib/qrDownload";
 import toast, { Toaster } from "react-hot-toast";
 
 /**
@@ -139,10 +140,41 @@ export default function PublicProfile() {
   }, [username]);
 
   useEffect(() => {
+    // Keep the browser tab title and the meta description in sync with
+    // the loaded profile. The title helps users who have several Mo Tech
+    // profiles open in tabs at once, and the description gets picked up
+    // by JS-rendering crawlers (LinkedIn, Slack, Discord, Twitter on
+    // some clients) when the link is shared. WhatsApp / FB / iMessage
+    // crawlers don't run JS, so they still see the static defaults from
+    // index.html — improving those would need SSR.
+    function setMeta(name, value, attr = "name") {
+      let el = document.querySelector(`meta[${attr}="${name}"]`);
+      if (!el) {
+        el = document.createElement("meta");
+        el.setAttribute(attr, name);
+        document.head.appendChild(el);
+      }
+      el.setAttribute("content", value);
+    }
+
     if (profile?.name) {
-      document.title = `${profile.name} — Mo Tech`;
+      const title = profile.title
+        ? `${profile.name} — ${profile.title}`
+        : `${profile.name} — Mo Tech`;
+      const description =
+        profile.bio?.trim() ||
+        `${profile.name}${profile.title ? `, ${profile.title}` : ""}`;
+      document.title = title;
+      setMeta("description", description);
+      setMeta("og:title", title, "property");
+      setMeta("og:description", description, "property");
+      setMeta("og:type", "profile", "property");
+      setMeta("twitter:card", "summary");
+      setMeta("twitter:title", title);
+      setMeta("twitter:description", description);
     } else if (notFound) {
       document.title = "Profile not found — Mo Tech";
+      setMeta("description", "This Mo Tech profile doesn't exist.");
     }
   }, [profile, notFound]);
 
@@ -185,11 +217,32 @@ export default function PublicProfile() {
     // `null` means no avatar field at all, which is also fine.
     const photoLines = buildVcardPhoto(profile.avatarUrl);
 
+    // vCard property escaping per RFC 2426 §4: a comma, semicolon,
+    // backslash, or newline inside the value would otherwise be parsed
+    // as a structural separator. Escape them defensively for the
+    // free-form text fields (NOTE, ORG, TITLE, FN).
+    function escVcard(s) {
+      if (!s) return "";
+      return s
+        .replace(/\\/g, "\\\\")
+        .replace(/\r?\n/g, "\\n")
+        .replace(/,/g, "\\,")
+        .replace(/;/g, "\\;");
+    }
+
     const vcf = [
       "BEGIN:VCARD",
       "VERSION:3.0",
-      `FN:${profile.name || ""}`,
-      `TITLE:${profile.title || ""}`,
+      `FN:${escVcard(profile.name || "")}`,
+      profile.title ? `TITLE:${escVcard(profile.title)}` : "",
+      // ORG defaults to the profile's title — Apple Contacts and iOS
+      // both surface the org line in lists and search, so populating
+      // it makes the saved card noticeably easier to find later.
+      profile.title ? `ORG:${escVcard(profile.title)}` : "",
+      // NOTE carries the bio so the contact card preserves the
+      // person's tagline / one-liner — useful for "where did I meet
+      // them?" recall.
+      profile.bio ? `NOTE:${escVcard(profile.bio)}` : "",
       email ? `EMAIL:${email}` : "",
       phone ? `TEL:${phone}` : "",
       `URL:${website}`,
@@ -439,10 +492,36 @@ export default function PublicProfile() {
         </div>
 
         {showQR && (
-          <div className="mb-7 flex justify-center animate-scale-in">
+          <div className="mb-7 flex flex-col items-center gap-3 animate-scale-in">
             <div className="bg-white p-4 rounded-2xl">
-              <QRCodeSVG value={window.location.href} size={180} />
+              <QRCodeSVG
+                id="public-profile-qr-svg"
+                value={window.location.href}
+                size={180}
+              />
             </div>
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  await downloadQrAsPng({
+                    svgId: "public-profile-qr-svg",
+                    filename: `${username}-qr`,
+                  });
+                } catch (err) {
+                  toast.error(err.message || "Couldn't download QR");
+                }
+              }}
+              className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors hover:scale-[1.03] active:scale-[0.97]"
+              style={{
+                backgroundColor: cardBg,
+                border: `1px solid ${cardBorder}`,
+                backdropFilter: cardBackdrop,
+              }}
+            >
+              <Download size={13} />
+              Download QR
+            </button>
           </div>
         )}
 
