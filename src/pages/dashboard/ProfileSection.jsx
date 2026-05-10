@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import reservedUsernames from "../../lib/reservedUsernames";
+import { downloadQrAsPng } from "../../lib/qrDownload";
 import toast from "react-hot-toast";
 import SkeletonLoader from "../../components/ui/SkeletonLoader";
 import Button from "../../components/ui/Button";
@@ -27,6 +28,7 @@ import IconButton from "../../components/ui/IconButton";
 import AvatarUploader from "../../components/dashboard/AvatarUploader";
 import NfcProgramDialog from "../../components/dashboard/NfcProgramDialog";
 import DeleteAccountDialog from "../../components/dashboard/DeleteAccountDialog";
+import ProfileCompleteness from "../../components/dashboard/ProfileCompleteness";
 
 const NAME_MAX = 60;
 const TITLE_MAX = 80;
@@ -37,7 +39,7 @@ function deepEqual(a, b) {
 }
 
 export default function ProfileSection() {
-  const { user, profile } = useOutletContext();
+  const { user, profile, links } = useOutletContext();
   const navigate = useNavigate();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [form, setForm] = useState({
@@ -244,19 +246,16 @@ export default function ProfileSection() {
     }
   }
 
-  function handleDownloadQR() {
+  async function handleDownloadQR() {
     if (!profileUrl) return;
-    const svg = document.getElementById("profile-qr-svg");
-    if (!svg) return;
-    const serializer = new XMLSerializer();
-    const source = serializer.serializeToString(svg);
-    const blob = new Blob([source], { type: "image/svg+xml;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${form.username || "profile"}-qr.svg`;
-    a.click();
-    URL.revokeObjectURL(url);
+    try {
+      await downloadQrAsPng({
+        svgId: "profile-qr-svg",
+        filename: `${form.username || "profile"}-qr`,
+      });
+    } catch (err) {
+      toast.error(err.message || "Couldn't download QR");
+    }
   }
 
   if (loading) {
@@ -279,6 +278,8 @@ export default function ProfileSection() {
           Your basic info and the URL people will visit.
         </p>
       </header>
+
+      <ProfileCompleteness profile={profile} links={links} />
 
       {/* Avatar + identity */}
       <Card padding="lg" className="mb-6">
@@ -347,7 +348,7 @@ export default function ProfileSection() {
                 onClick={handleDownloadQR}
                 className="text-app hover:text-app hover:bg-black/5"
               >
-                Download SVG
+                Download PNG
               </Button>
             </div>
           )}
