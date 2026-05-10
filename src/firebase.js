@@ -1,7 +1,12 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
+
+// Firebase Storage is intentionally NOT initialized here. Avatars are
+// stored inline as data URLs on `profiles/{uid}.avatarUrl`, and
+// nothing else in the app uses Storage. Keeping the SDK out of the
+// bundle saves ~30 KB gzipped and prevents accidental future imports
+// from spinning up a billable Storage backend.
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -16,6 +21,5 @@ const app = initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
 export const db = getFirestore(app);
-export const storage = getStorage(app);
 export const googleProvider = new GoogleAuthProvider();
 export default app;

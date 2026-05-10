@@ -59,17 +59,18 @@ Fill in your Firebase config values in `.env`:
 VITE_FIREBASE_API_KEY=your_api_key
 VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
 VITE_FIREBASE_PROJECT_ID=your_project_id
-VITE_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
 VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
 VITE_FIREBASE_APP_ID=your_app_id
 ```
+
+(`VITE_FIREBASE_STORAGE_BUCKET` is no longer required — avatars are stored inline as data URLs on the user's profile document, so Firebase Storage can stay disabled on the project.)
 
 ### 4. Deploy Firebase Rules & Indexes
 
 ```bash
 npm install -g firebase-tools
 firebase login
-firebase deploy --only firestore:rules,firestore:indexes,storage
+firebase deploy --only firestore:rules,firestore:indexes
 ```
 
 ### 5. Run Development Server

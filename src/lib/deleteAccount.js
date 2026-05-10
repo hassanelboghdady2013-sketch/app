@@ -13,8 +13,7 @@ import {
   getDocs,
   deleteDoc,
 } from "firebase/firestore";
-import { ref, deleteObject } from "firebase/storage";
-import { db, storage } from "../firebase";
+import { db } from "../firebase";
 
 /**
  * Returns true if the current user signed in with Google (vs. email/
@@ -68,25 +67,19 @@ export async function reauthenticate(user, { password } = {}) {
  *   - `auth.currentUser.delete()` runs LAST. If it fails, all other
  *     data is already gone, which is the safer failure mode.
  *
+ * Note: avatars now live inline as data URLs inside `profiles/{uid}`
+ * (Firebase Storage is intentionally disabled on this project) so
+ * deleting the profile doc also removes the avatar — no separate
+ * storage step is needed. Legacy users with a Storage-hosted
+ * avatarUrl are also covered: the URL is just a string field on the
+ * profile, gone the moment we delete the profile doc.
+ *
  * `onProgress(stage)` is invoked between stages so callers can render
  * a step-by-step progress UI.
  */
 export async function deleteAccountData(user, onProgress = () => {}) {
   if (!user) throw new Error("Not signed in");
   const { uid } = user;
-
-  onProgress("avatar");
-  try {
-    await deleteObject(ref(storage, `avatars/${uid}/avatar.jpg`));
-  } catch (err) {
-    // Avatars are optional — first-time Google users in particular
-    // may have a Google profile photo URL but no object in our bucket.
-    if (err?.code !== "storage/object-not-found") {
-      // Non-fatal; log and continue. The orphan can be cleaned up
-      // out-of-band if it ever exists.
-      console.warn("Avatar delete failed during account deletion:", err);
-    }
-  }
 
   onProgress("links");
   const linksSnap = await getDocs(
