@@ -16,16 +16,64 @@
  * caller can do something else with it (e.g. Web Share API).
  */
 
+/**
+ * SVG loaded into an <img> via a data: URL runs in a sandboxed mode
+ * that refuses to fetch external resources (https://, blob:, etc.).
+ * Any <image> tag inside the SVG that points at a remote URL would
+ * silently fail to render in the exported PNG.
+ *
+ * Walk the SVG clone, fetch any non-data hrefs as blobs, convert to
+ * data: URLs, and patch the href in place. After this, the whole SVG
+ * is self-contained and exports cleanly.
+ *
+ * data: URLs (the default for avatars + link icons since #12 / #14)
+ * pass through untouched - this is purely defensive for legacy users
+ * still on Firebase Storage URLs.
+ */
+async function inlineSvgImages(svgClone) {
+  const images = svgClone.querySelectorAll("image");
+  await Promise.all(
+    Array.from(images).map(async (img) => {
+      const href =
+        img.getAttribute("href") || img.getAttribute("xlink:href") || "";
+      if (!href || href.startsWith("data:")) return;
+      try {
+        const res = await fetch(href, { mode: "cors" });
+        if (!res.ok) return;
+        const blob = await res.blob();
+        const dataUrl = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.onerror = () => reject(reader.error);
+          reader.readAsDataURL(blob);
+        });
+        img.setAttribute("href", dataUrl);
+        // Remove the legacy attribute too so old SVG renderers don't
+        // pick the unfetchable URL.
+        img.removeAttribute("xlink:href");
+      } catch {
+        // CORS-blocked or otherwise unreachable. Leave the href alone;
+        // the avatar slot will be empty in the export, but everything
+        // else still renders.
+      }
+    })
+  );
+}
+
 async function svgIdToPngBlob({ svgId, width, height, background }) {
   const svg = document.getElementById(svgId);
   if (!svg) throw new Error("SVG not rendered");
+
+  // Clone so we can mutate freely without disturbing the live preview.
+  const clone = svg.cloneNode(true);
+  await inlineSvgImages(clone);
 
   // Serialize the SVG and wrap it in a base64 data URL the Image
   // element can load synchronously. We can't use a Blob URL here
   // because some browsers (Safari) refuse to draw cross-origin-tainted
   // blob: SVG images onto a canvas, even when the SVG content is local.
   const serializer = new XMLSerializer();
-  const xml = serializer.serializeToString(svg);
+  const xml = serializer.serializeToString(clone);
   const svg64 = btoa(unescape(encodeURIComponent(xml)));
   const dataUrl = `data:image/svg+xml;base64,${svg64}`;
 

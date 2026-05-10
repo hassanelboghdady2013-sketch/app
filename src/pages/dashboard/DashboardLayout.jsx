@@ -323,7 +323,7 @@ export default function DashboardLayout() {
         aria-label="Sections"
         className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-app/95 backdrop-blur-lg border-t border-line"
       >
-        <div className="max-w-md mx-auto px-2 grid grid-cols-4">
+        <div className="max-w-md mx-auto px-2 grid grid-cols-5">
           {navItems.map(({ to, icon: Icon, label }) => (
             <NavLink
               key={to}
