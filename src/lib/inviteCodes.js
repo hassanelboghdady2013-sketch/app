@@ -87,6 +87,9 @@ export async function claimInviteCode({ uid, email, code }) {
     tx.update(codeRef, {
       claimedBy: uid,
       claimedAt: serverTimestamp(),
+      // Stored alongside the uid so /admin/codes can render a human-friendly
+      // email without an extra users/{uid} read for every claimed row.
+      claimedEmail: email || null,
     });
   });
 
@@ -160,6 +163,32 @@ export async function mintInviteCodes({ count = 1, prefix = "MOTECH", note = nul
   }
   await batch.commit();
   return minted;
+}
+
+/**
+ * Look up the email for each uid by reading users/{uid}.email. Used by
+ * /admin/codes to backfill the email column for invite codes claimed
+ * before claimedEmail was being written. Requires admin (server-side
+ * `users` read rule allows admins).
+ *
+ * Returns a Map<uid, email|null>. Missing/forbidden lookups map to null
+ * so callers can render a fallback without retrying.
+ */
+export async function fetchUserEmails(uids) {
+  const unique = Array.from(new Set((uids || []).filter(Boolean)));
+  const results = await Promise.all(
+    unique.map(async (uid) => {
+      try {
+        const snap = await getDoc(doc(db, "users", uid));
+        if (!snap.exists()) return [uid, null];
+        const data = snap.data() || {};
+        return [uid, data.email || null];
+      } catch {
+        return [uid, null];
+      }
+    })
+  );
+  return new Map(results);
 }
 
 /**

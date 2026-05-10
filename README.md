@@ -156,6 +156,13 @@ node scripts/mint-invite-codes.cjs 1 --note="Order #123 / Salma's card"
 3. Admin-only operations: `inviteCodes` `list`, `create`, and `delete` are
    all gated on `isAdmin()` (presence in `admins/{uid}`). Single-doc reads
    stay public so the registration form can still verify a code.
+4. Each claimed code stores `claimedBy` (uid), `claimedAt`, and
+   `claimedEmail` so the admin page can render the claimer's email
+   directly. The rules require `claimedEmail` to match
+   `request.auth.token.email` if it's set, which prevents tagging a code
+   with someone else's address. Admins can also read `users/{uid}.email`
+   to backfill the email column for codes claimed before this field
+   existed.
 
 Once claimed, codes cannot be unclaimed — to "transfer" a profile, the user
 should change their username and the original code stays tied to their uid.

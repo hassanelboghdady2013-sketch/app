@@ -18,6 +18,7 @@ import {
   listInviteCodes,
   mintInviteCodes,
   deleteInviteCode,
+  fetchUserEmails,
 } from "../../lib/inviteCodes";
 import Logo from "../../components/ui/Logo";
 import Button from "../../components/ui/Button";
@@ -85,8 +86,12 @@ function CopyButton({ value, label = "Copy" }) {
   );
 }
 
-function CodeRow({ row, onDelete }) {
+function CodeRow({ row, onDelete, resolvedEmail }) {
   const claimed = !!row.claimedBy;
+  // Prefer the email written on the code doc itself (cheap, no extra read);
+  // fall back to the email pulled from users/{claimedBy} for legacy claims
+  // that don't have claimedEmail set yet.
+  const email = row.claimedEmail || resolvedEmail || null;
   return (
     <tr className="border-t border-line align-middle">
       <td className="py-2.5 pl-4 pr-3">
@@ -107,10 +112,17 @@ function CodeRow({ row, onDelete }) {
       </td>
       <td className="py-2.5 px-3 text-xs text-muted">
         {claimed ? (
-          <div className="flex flex-col">
-            <code className="font-mono text-[11px] text-fg/80 truncate max-w-[18ch]">
-              {row.claimedBy}
-            </code>
+          <div
+            className="flex flex-col min-w-0"
+            title={`uid: ${row.claimedBy}`}
+          >
+            {email ? (
+              <span className="text-fg/90 truncate max-w-[24ch]">{email}</span>
+            ) : (
+              <code className="font-mono text-[11px] text-fg/80 truncate max-w-[18ch]">
+                {row.claimedBy}
+              </code>
+            )}
             <span className="text-faint">{formatDate(row.claimedAt)}</span>
           </div>
         ) : (
@@ -149,6 +161,9 @@ export default function AdminCodes() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [pendingDelete, setPendingDelete] = useState(null);
   const [lastMinted, setLastMinted] = useState([]);
+  // uid -> email looked up from users/{uid} for codes claimed before
+  // claimedEmail was being persisted on the code doc.
+  const [resolvedEmails, setResolvedEmails] = useState({});
 
   useEffect(() => {
     document.title = "Invite codes — Mo Tech admin";
@@ -159,6 +174,24 @@ export default function AdminCodes() {
     try {
       const next = await listInviteCodes({ max: 500 });
       setRows(next);
+      // Look up emails for legacy claimed codes that don't have
+      // claimedEmail populated. Skip uids we've already resolved.
+      const missing = next
+        .filter((r) => r.claimedBy && !r.claimedEmail)
+        .map((r) => r.claimedBy);
+      if (missing.length) {
+        try {
+          const map = await fetchUserEmails(missing);
+          setResolvedEmails((prev) => {
+            const out = { ...prev };
+            for (const [uid, email] of map) out[uid] = email;
+            return out;
+          });
+        } catch {
+          // Email lookup is best-effort; the UI already falls back to the
+          // uid if we can't resolve.
+        }
+      }
     } catch (err) {
       toast.error(err.message || "Failed to load codes");
     } finally {
@@ -197,13 +230,15 @@ export default function AdminCodes() {
       if (statusFilter === "claimed" && !r.claimedBy) return false;
       if (statusFilter === "available" && r.claimedBy) return false;
       if (!q) return true;
+      const email = r.claimedEmail || resolvedEmails[r.claimedBy] || "";
       return (
         r.id.toUpperCase().includes(q) ||
         (r.note || "").toUpperCase().includes(q) ||
-        (r.claimedBy || "").toUpperCase().includes(q)
+        (r.claimedBy || "").toUpperCase().includes(q) ||
+        email.toUpperCase().includes(q)
       );
     });
-  }, [rows, filter, statusFilter]);
+  }, [rows, filter, statusFilter, resolvedEmails]);
 
   async function handleMint(e) {
     e.preventDefault();
@@ -440,7 +475,7 @@ export default function AdminCodes() {
                 <Input
                   value={filter}
                   onChange={(e) => setFilter(e.target.value)}
-                  placeholder="Search code, note, uid…"
+                  placeholder="Search code, note, email, uid…"
                   leftIcon={<Search size={14} />}
                 />
               </div>
@@ -495,6 +530,9 @@ export default function AdminCodes() {
                     <CodeRow
                       key={row.id}
                       row={row}
+                      resolvedEmail={
+                        row.claimedBy ? resolvedEmails[row.claimedBy] : null
+                      }
                       onDelete={(r) => setPendingDelete(r)}
                     />
                   ))
