@@ -92,10 +92,13 @@ export default function AvatarUploader({
         return;
       }
       setBusy(true);
+      // Hoisted out of the try so we can revoke it from `catch` /
+      // `finally` even when the storage call below throws.
+      let localUrl = null;
       try {
         const blob = await cropAndDownscale(file);
         // Show optimistic preview immediately.
-        const localUrl = URL.createObjectURL(blob);
+        localUrl = URL.createObjectURL(blob);
         setPreview(localUrl);
         // Stable filename so a new upload overwrites the previous file
         // (no orphaned avatars accumulating in Storage).
@@ -108,16 +111,17 @@ export default function AvatarUploader({
           cacheControl: "public, max-age=60",
         });
         const url = await getDownloadURL(storageRef);
-        onChange(url);
-        // Clean up the object URL once the real download URL is in
-        // place; we leave `preview` populated until value updates.
-        URL.revokeObjectURL(localUrl);
+        // The parent persists this URL to Firestore. We await so any
+        // persistence error surfaces as the toast below instead of
+        // leaving Storage and Firestore out of sync.
+        await Promise.resolve(onChange(url));
         setPreview("");
         toast.success("Photo updated");
       } catch (err) {
         toast.error(err.message || "Upload failed");
         setPreview("");
       } finally {
+        if (localUrl) URL.revokeObjectURL(localUrl);
         setBusy(false);
       }
     },
@@ -128,15 +132,18 @@ export default function AvatarUploader({
     if (!uid || disabled || busy) return;
     setBusy(true);
     try {
-      // Best-effort: object may not exist if the previous avatar lived
-      // somewhere else (e.g. a Google profile photo URL). Ignore "not
-      // found" errors silently.
+      // Clear Firestore *first* so it never points to a deleted Storage
+      // object — if the storage delete below fails for any reason, we
+      // just leave an orphan we can sweep later (vs. a broken <img>).
+      await Promise.resolve(onChange(""));
+      // Best-effort: the object may not exist if the previous avatar
+      // lived somewhere else (e.g. a Google profile photo URL). Ignore
+      // "not found" errors silently.
       try {
         await deleteObject(ref(storage, `avatars/${uid}/avatar.jpg`));
       } catch (err) {
         if (err?.code !== "storage/object-not-found") throw err;
       }
-      onChange("");
       setPreview("");
       toast.success("Photo removed");
     } catch (err) {

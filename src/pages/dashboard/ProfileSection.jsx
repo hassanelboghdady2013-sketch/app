@@ -111,12 +111,31 @@ export default function ProfileSection() {
     }, 300);
   }, []);
 
-  // The AvatarUploader writes the photo to Storage and gives us the
-  // download URL; persistence to Firestore happens on the next Save click
-  // alongside the rest of the profile fields. (The photo itself is
-  // already in Storage by then, so a stale page reload won't lose it.)
-  function handleAvatarChange(url) {
-    setAvatarUrl(url || "");
+  // Avatar changes persist *immediately* to Firestore — we don't fold
+  // them into the deferred Save flow because the AvatarUploader has
+  // already mutated Storage (uploaded a new file, or deleted the old
+  // one) by the time it calls us. Storing eagerly keeps Firestore and
+  // Storage in sync; otherwise a Discard click would leave Firestore
+  // pointing at a Storage object that no longer matches.
+  async function handleAvatarChange(url) {
+    if (!user?.uid) return;
+    const next = url || "";
+    setAvatarUrl(next);
+    try {
+      await setDoc(
+        doc(db, "profiles", user.uid),
+        { avatarUrl: next, updatedAt: serverTimestamp() },
+        { merge: true }
+      );
+      // Keep dirty-tracking in sync so the Save bar doesn't surface
+      // "unsaved changes" purely because the avatar changed.
+      setInitialState((prev) => (prev ? { ...prev, avatarUrl: next } : prev));
+    } catch (err) {
+      toast.error(err.message || "Couldn't save photo");
+      // Re-throw so AvatarUploader's catch can show its own toast and
+      // skip its success path.
+      throw err;
+    }
   }
 
   function handleChange(field, value) {

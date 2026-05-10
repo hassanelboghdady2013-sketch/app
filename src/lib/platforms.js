@@ -72,11 +72,15 @@ export function buildLinkUrl(platformId, raw) {
     return value.toLowerCase().startsWith("mailto:") ? value : `mailto:${value}`;
   }
   if (p.inputMode === "tel") {
-    if (value.toLowerCase().startsWith("tel:")) return value;
     // Phone numbers commonly include spaces, dashes, parens; strip them so
-    // the tel: URI is well-formed but keep the leading + and digits.
-    const cleaned = value.replace(/[^\d+]/g, "");
-    return `tel:${cleaned}`;
+    // the tel: URI is well-formed but keep the leading + and digits. We
+    // also normalize the case where the user pasted a value that already
+    // starts with `tel:` — strip it before cleaning so the resulting URI
+    // doesn't keep stray spaces.
+    const body = value.toLowerCase().startsWith("tel:")
+      ? value.slice("tel:".length)
+      : value;
+    return `tel:${body.replace(/[^\d+]/g, "")}`;
   }
   return value;
 }
