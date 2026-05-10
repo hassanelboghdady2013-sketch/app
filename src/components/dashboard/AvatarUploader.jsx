@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { Camera, Trash2, Loader2, Upload, ImageIcon } from "lucide-react";
 import toast from "react-hot-toast";
+import { cropAndEncode } from "../../lib/imageEncode";
 
 const MAX_BYTES = 4 * 1024 * 1024; // 4MB original-file cap.
 const ACCEPT = "image/jpeg,image/png,image/webp";
@@ -14,59 +15,6 @@ const JPEG_QUALITY = 0.82;
 // fits comfortably even with the rest of the profile doc, so this is
 // a safety net rather than the primary constraint.
 const MAX_DATA_URL_BYTES = 64 * 1024;
-
-/**
- * Read a file into an HTMLImageElement so we can resize/crop on a
- * canvas. We only ever read the file as a data URL on disk locally —
- * the Image's src is then revoked-by-replace when the function returns.
- */
-function readImage(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const img = new Image();
-      img.onload = () => resolve(img);
-      img.onerror = () => reject(new Error("Image is not a valid format"));
-      img.src = reader.result;
-    };
-    reader.onerror = () => reject(reader.error || new Error("File read failed"));
-    reader.readAsDataURL(file);
-  });
-}
-
-/**
- * Center-crop the image to a square, downscale to OUTPUT_SIZE, and
- * encode as a JPEG data URL. Returns the data URL string, ready to be
- * persisted directly into Firestore.
- *
- * We use a data URL (not a Blob → Storage URL) because the user has
- * disabled Firebase Storage on this project — the avatar lives inline
- * inside `profiles/{uid}.avatarUrl`. The downscale + quality combo
- * targets ~25–35 KB encoded, well under Firestore's 1 MB doc cap.
- */
-async function cropAndEncode(file) {
-  const img = await readImage(file);
-  const minSide = Math.min(img.naturalWidth, img.naturalHeight);
-  const sx = (img.naturalWidth - minSide) / 2;
-  const sy = (img.naturalHeight - minSide) / 2;
-  const canvas = document.createElement("canvas");
-  canvas.width = OUTPUT_SIZE;
-  canvas.height = OUTPUT_SIZE;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Canvas not supported in this browser");
-  ctx.drawImage(img, sx, sy, minSide, minSide, 0, 0, OUTPUT_SIZE, OUTPUT_SIZE);
-  const dataUrl = canvas.toDataURL("image/jpeg", JPEG_QUALITY);
-  if (dataUrl.length > MAX_DATA_URL_BYTES) {
-    // Extremely high-frequency / noisy image that JPEG can't compress
-    // small enough. Should be rare at 256x256 + q0.82, but if it
-    // happens we want a clear error rather than a Firestore write
-    // failure.
-    throw new Error(
-      "Image is too detailed to compress small enough — try a simpler photo."
-    );
-  }
-  return dataUrl;
-}
 
 /**
  * Friendly avatar picker — click the circle, pick a file, see a
@@ -104,7 +52,12 @@ export default function AvatarUploader({
       }
       setBusy(true);
       try {
-        const dataUrl = await cropAndEncode(file);
+        const dataUrl = await cropAndEncode(file, {
+          size: OUTPUT_SIZE,
+          format: "jpeg",
+          quality: JPEG_QUALITY,
+          maxBytes: MAX_DATA_URL_BYTES,
+        });
         // Show the encoded image instantly. Same image goes to the
         // parent for persistence; once the parent's `value` updates we
         // can clear the local preview without a flicker.

@@ -429,10 +429,18 @@ export default function PublicProfile() {
                 }}
               >
                 <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                  className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 overflow-hidden"
                   style={{ backgroundColor: `${accent}1f` }}
                 >
-                  <Icon size={18} style={{ color: accent }} />
+                  {link.iconUrl ? (
+                    <img
+                      src={link.iconUrl}
+                      alt=""
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <Icon size={18} style={{ color: accent }} />
+                  )}
                 </div>
                 <span className="flex-1 font-medium text-sm">
                   {link.title || platform.label}

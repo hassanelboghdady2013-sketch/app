@@ -46,6 +46,7 @@ import Input from "../../components/ui/Input";
 import Select from "../../components/ui/Select";
 import Card from "../../components/ui/Card";
 import IconButton from "../../components/ui/IconButton";
+import LinkIconUploader from "../../components/dashboard/LinkIconUploader";
 import toast from "react-hot-toast";
 
 function SortableLink({ link, onEdit, onDelete, onToggle }) {
@@ -77,8 +78,12 @@ function SortableLink({ link, onEdit, onDelete, onToggle }) {
       >
         <GripVertical size={18} />
       </button>
-      <div className="w-10 h-10 rounded-lg bg-brand-soft text-brand grid place-items-center shrink-0">
-        <Icon size={16} />
+      <div className="w-10 h-10 rounded-lg bg-brand-soft text-brand grid place-items-center shrink-0 overflow-hidden">
+        {link.iconUrl ? (
+          <img src={link.iconUrl} alt="" className="w-full h-full object-cover" />
+        ) : (
+          <Icon size={16} />
+        )}
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium truncate">
@@ -133,7 +138,12 @@ export default function LinksSection() {
   const { user, links } = useOutletContext();
   const [editingLink, setEditingLink] = useState(null);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ platform: "linkedin", title: "", url: "" });
+  const [form, setForm] = useState({
+    platform: "linkedin",
+    title: "",
+    url: "",
+    iconUrl: "",
+  });
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
 
@@ -164,7 +174,7 @@ export default function LinksSection() {
 
   function openAddForm() {
     setEditingLink(null);
-    setForm({ platform: "linkedin", title: "", url: "" });
+    setForm({ platform: "linkedin", title: "", url: "", iconUrl: "" });
     setShowForm(true);
   }
 
@@ -177,6 +187,7 @@ export default function LinksSection() {
       platform: link.platform,
       title: link.title,
       url: extractLinkValue(link.platform, link.url),
+      iconUrl: link.iconUrl || "",
     });
     setShowForm(true);
   }
@@ -218,6 +229,12 @@ export default function LinksSection() {
           platform: form.platform,
           title: form.title || platform.label,
           url,
+          // Persist whatever the user has set (data URL or empty
+          // string). Empty string explicitly clears a previously-set
+          // custom icon — we store "" rather than deleting the field
+          // so the rules' `affectedKeys` checks stay simple and the
+          // dashboard list doesn't have to distinguish missing-vs-empty.
+          iconUrl: form.iconUrl || "",
         });
         toast.success("Link updated");
       } else {
@@ -227,6 +244,7 @@ export default function LinksSection() {
           title: form.title || platform.label,
           url,
           iconSlug: form.platform,
+          iconUrl: form.iconUrl || "",
           order: links.length,
           active: true,
           createdAt: serverTimestamp(),
@@ -358,6 +376,26 @@ export default function LinksSection() {
               />
             );
           })()}
+          <div>
+            <label className="block text-xs font-medium text-faint uppercase tracking-wide mb-2">
+              Icon
+            </label>
+            {(() => {
+              const p = getPlatform(form.platform);
+              const Fallback = p.icon;
+              return (
+                <LinkIconUploader
+                  value={form.iconUrl}
+                  fallback={<Fallback size={18} />}
+                  onChange={(next) => setForm((f) => ({ ...f, iconUrl: next }))}
+                  disabled={saving}
+                />
+              );
+            })()}
+            <p className="text-xs text-muted mt-2">
+              Optional — uses the platform's default icon if you don't upload one.
+            </p>
+          </div>
           <div className="flex gap-3 pt-1">
             <Button onClick={handleSave} loading={saving}>
               {editingLink ? "Save changes" : "Add link"}
