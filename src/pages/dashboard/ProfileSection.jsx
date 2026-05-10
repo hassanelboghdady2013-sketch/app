@@ -132,12 +132,19 @@ export default function ProfileSection() {
   async function handleAvatarChange(url) {
     if (!user?.uid) return;
     const next = url || "";
-    setAvatarUrl(next);
+    // Persist *first*, then bump local state. If we set state
+    // optimistically and the Firestore write throws, the avatar
+    // circle would be showing the new image and `dirty` would flip
+    // true — directly contradicting the error toast the uploader is
+    // about to show. AvatarUploader already shows the in-flight
+    // preview off its own local blob URL, so visual feedback isn't
+    // lost by waiting for the round-trip.
     await setDoc(
       doc(db, "profiles", user.uid),
       { avatarUrl: next, updatedAt: serverTimestamp() },
       { merge: true }
     );
+    setAvatarUrl(next);
     // Keep dirty-tracking in sync so the Save bar doesn't surface
     // "unsaved changes" purely because the avatar changed.
     setInitialState((prev) => (prev ? { ...prev, avatarUrl: next } : prev));
