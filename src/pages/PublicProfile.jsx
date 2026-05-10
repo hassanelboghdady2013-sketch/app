@@ -294,6 +294,8 @@ export default function PublicProfile() {
   const cardBackdrop = cssVars["--theme-card-backdrop"] || "blur(12px)";
   const cardShadow = cssVars["--theme-card-shadow"] || "none";
   const activeLinks = links.filter((l) => l.active !== false);
+  const compactLinks = activeLinks.filter((l) => l.compact);
+  const cardLinks = activeLinks.filter((l) => !l.compact);
 
   return (
     <div
@@ -342,6 +344,40 @@ export default function PublicProfile() {
             >
               {profile.bio}
             </p>
+          )}
+          {compactLinks.length > 0 && (
+            <div className="flex flex-wrap items-center justify-center gap-3 mt-5">
+              {compactLinks.map((link) => {
+                const platform = getPlatform(link.platform);
+                const Icon = platform.icon;
+                return (
+                  <button
+                    key={link.id}
+                    type="button"
+                    onClick={() => handleLinkClick(link.id, link.url)}
+                    aria-label={link.title || platform.label}
+                    title={link.title || platform.label}
+                    className="w-10 h-10 rounded-full flex items-center justify-center overflow-hidden transition-transform hover:scale-110 active:scale-95"
+                    style={{
+                      backgroundColor: cardBg,
+                      border: `1px solid ${cardBorder}`,
+                      backdropFilter: cardBackdrop,
+                      boxShadow: cardShadow,
+                    }}
+                  >
+                    {link.iconUrl ? (
+                      <img
+                        src={link.iconUrl}
+                        alt=""
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <Icon size={16} style={{ color: accent }} />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           )}
         </div>
 
@@ -412,7 +448,7 @@ export default function PublicProfile() {
 
         {/* Links */}
         <div className="space-y-3">
-          {activeLinks.map((link, index) => {
+          {cardLinks.map((link, index) => {
             const platform = getPlatform(link.platform);
             const Icon = platform.icon;
             return (

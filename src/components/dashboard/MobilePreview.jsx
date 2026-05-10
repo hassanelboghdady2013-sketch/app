@@ -5,6 +5,8 @@ export default function MobilePreview({ profile, links }) {
   const theme = profile?.themeJson || null;
   const cssVars = getThemeCSS(theme);
   const visibleLinks = (links || []).filter((l) => l.active !== false);
+  const compactLinks = visibleLinks.filter((l) => l.compact);
+  const cardLinks = visibleLinks.filter((l) => !l.compact);
 
   return (
     <div className="w-[280px] h-[560px] rounded-[2.5rem] border-[3px] border-line-strong bg-app-soft overflow-hidden shadow-[0_30px_60px_-20px_rgba(0,0,0,0.6)] relative">
@@ -53,10 +55,48 @@ export default function MobilePreview({ profile, links }) {
               {profile.bio}
             </p>
           )}
+          {compactLinks.length > 0 && (
+            <div className="flex flex-wrap items-center justify-center gap-1.5 mt-3">
+              {compactLinks.map((link) => {
+                const platform = getPlatform(link.platform);
+                const Icon = platform.icon;
+                return (
+                  <div
+                    key={link.id}
+                    className="w-6 h-6 rounded-full flex items-center justify-center overflow-hidden"
+                    style={{
+                      backgroundColor:
+                        cssVars["--theme-card-bg"] || "rgba(255,255,255,0.06)",
+                      border: `1px solid ${
+                        cssVars["--theme-card-border"] || "rgba(255,255,255,0.1)"
+                      }`,
+                    }}
+                    title={link.title || platform.label}
+                  >
+                    {link.iconUrl ? (
+                      <img
+                        src={link.iconUrl}
+                        alt=""
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <Icon
+                        size={10}
+                        style={{
+                          color:
+                            cssVars["--theme-accent"] || "var(--color-brand)",
+                        }}
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         <div className="space-y-2">
-          {visibleLinks.map((link) => {
+          {cardLinks.map((link) => {
             const platform = getPlatform(link.platform);
             const Icon = platform.icon;
             return (

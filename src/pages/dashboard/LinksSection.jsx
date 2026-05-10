@@ -86,9 +86,19 @@ function SortableLink({ link, onEdit, onDelete, onToggle }) {
         )}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate">
-          {link.title || platform.label}
-        </p>
+        <div className="flex items-center gap-1.5">
+          <p className="text-sm font-medium truncate">
+            {link.title || platform.label}
+          </p>
+          {link.compact && (
+            <span
+              className="text-[10px] uppercase tracking-wide font-semibold px-1.5 py-0.5 rounded bg-brand-soft text-brand shrink-0"
+              title="Renders as a small icon under the bio"
+            >
+              icon
+            </span>
+          )}
+        </div>
         <p className="text-xs text-muted truncate">
           {extractLinkValue(link.platform, link.url)}
         </p>
@@ -143,6 +153,7 @@ export default function LinksSection() {
     title: "",
     url: "",
     iconUrl: "",
+    compact: false,
   });
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -174,7 +185,13 @@ export default function LinksSection() {
 
   function openAddForm() {
     setEditingLink(null);
-    setForm({ platform: "linkedin", title: "", url: "", iconUrl: "" });
+    setForm({
+      platform: "linkedin",
+      title: "",
+      url: "",
+      iconUrl: "",
+      compact: false,
+    });
     setShowForm(true);
   }
 
@@ -188,6 +205,7 @@ export default function LinksSection() {
       title: link.title,
       url: extractLinkValue(link.platform, link.url),
       iconUrl: link.iconUrl || "",
+      compact: !!link.compact,
     });
     setShowForm(true);
   }
@@ -235,6 +253,7 @@ export default function LinksSection() {
           // so the rules' `affectedKeys` checks stay simple and the
           // dashboard list doesn't have to distinguish missing-vs-empty.
           iconUrl: form.iconUrl || "",
+          compact: !!form.compact,
         });
         toast.success("Link updated");
       } else {
@@ -245,6 +264,7 @@ export default function LinksSection() {
           url,
           iconSlug: form.platform,
           iconUrl: form.iconUrl || "",
+          compact: !!form.compact,
           order: links.length,
           active: true,
           createdAt: serverTimestamp(),
@@ -376,6 +396,52 @@ export default function LinksSection() {
               />
             );
           })()}
+          <div>
+            <label className="block text-xs font-medium text-faint uppercase tracking-wide mb-2">
+              Display style
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {/*
+                Two visual choices for where this link appears on the
+                public profile:
+                  - card    → the existing full-width row with title,
+                              subtitle and chevron.
+                  - compact → a small circular icon in a horizontal
+                              row under the bio.
+                Stored as a boolean (`compact`) on the link doc.
+              */}
+              <button
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, compact: false }))}
+                aria-pressed={!form.compact}
+                className={`text-left p-3 rounded-xl border transition-colors ${
+                  !form.compact
+                    ? "border-brand bg-brand-soft/40"
+                    : "border-line bg-card hover:border-line-strong"
+                }`}
+              >
+                <div className="text-sm font-medium">Card</div>
+                <div className="text-xs text-muted mt-0.5">
+                  Full-width row with title.
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, compact: true }))}
+                aria-pressed={form.compact}
+                className={`text-left p-3 rounded-xl border transition-colors ${
+                  form.compact
+                    ? "border-brand bg-brand-soft/40"
+                    : "border-line bg-card hover:border-line-strong"
+                }`}
+              >
+                <div className="text-sm font-medium">Small icon</div>
+                <div className="text-xs text-muted mt-0.5">
+                  Sits in the icon row under bio.
+                </div>
+              </button>
+            </div>
+          </div>
           <div>
             <label className="block text-xs font-medium text-faint uppercase tracking-wide mb-2">
               Icon
