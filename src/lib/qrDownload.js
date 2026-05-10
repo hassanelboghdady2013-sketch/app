@@ -66,6 +66,13 @@ async function svgIdToPngBlob({ svgId, width, height, background }) {
 
   // Clone so we can mutate freely without disturbing the live preview.
   const clone = svg.cloneNode(true);
+  // Stamp explicit pixel dimensions on the clone. The live SVG uses
+  // width="100%" so its layout adapts to the page, but loaded into an
+  // <img> via a data: URL it has no layout context — Safari + a few
+  // others will fall back to the CSS replaced-element default (300x150)
+  // and render a tiny bitmap that drawImage then scales up blurrily.
+  clone.setAttribute("width", String(width));
+  clone.setAttribute("height", String(height));
   await inlineSvgImages(clone);
 
   // Serialize the SVG and wrap it in a base64 data URL the Image
