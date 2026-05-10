@@ -15,21 +15,22 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { user, loading: authLoading, login, loginWithGoogle } = useAuth();
+  const { user, login, loginWithGoogle, logout } = useAuth();
   const navigate = useNavigate();
-  // Set while handleGoogle is running so the "already signed in → dashboard"
-  // effect below doesn't race with the in-flight users/{uid} check.
+  // Set while handleGoogle is running so the in-flight users/{uid}
+  // check isn't disturbed by re-renders.
   const handlingGoogleRef = useRef(false);
 
   useEffect(() => {
     document.title = "Log in — Mo Tech";
   }, []);
 
-  useEffect(() => {
-    if (!authLoading && user && !handlingGoogleRef.current) {
-      navigate("/dashboard", { replace: true });
-    }
-  }, [user, authLoading, navigate]);
+  // Note: we intentionally do NOT auto-redirect signed-in visitors
+  // away from /login. The Landing nav surfaces a "Log in" CTA that
+  // must remain functional even when a session already exists — for
+  // a card-owner showing the page to a friend, or for switching
+  // between accounts. The "Already signed in" banner below offers a
+  // direct shortcut to the dashboard without forcing the redirect.
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -89,8 +90,40 @@ export default function Login() {
     }
   }
 
+  async function handleSwitchAccount() {
+    try {
+      await logout();
+      toast.success("Signed out — pick another account.");
+    } catch {
+      toast.error("Couldn't sign out");
+    }
+  }
+
   return (
     <AuthShell title="Welcome back" subtitle="Log in to manage your Mo Tech profile.">
+      {user && (
+        <div className="mb-5 p-3 rounded-xl bg-brand-soft text-fg border border-line text-sm">
+          <p className="text-muted mb-2">
+            You&apos;re already signed in as{" "}
+            <span className="text-fg font-medium">{user.email}</span>.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              onClick={() => navigate("/dashboard")}
+            >
+              Go to dashboard
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleSwitchAccount}
+            >
+              Use a different account
+            </Button>
+          </div>
+        </div>
+      )}
       <Button
         variant="outline"
         size="lg"

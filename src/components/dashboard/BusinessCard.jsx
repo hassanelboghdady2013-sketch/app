@@ -33,10 +33,17 @@ function pickContact(links) {
   for (const l of active) {
     const p = getPlatform(l.platform);
     if (!email && p.inputMode === "email") {
-      email = (l.url || "").replace(/^mailto:/i, "");
+      // Strip any leading non-email characters defensively. Some
+      // legacy values still carry the `mailto:` prefix; newer ones
+      // are stored bare.
+      email = (l.url || "").replace(/^mailto:/i, "").trim();
     }
     if (!phone && p.inputMode === "tel") {
-      phone = (l.url || "").replace(/^tel:/i, "");
+      // Strip anything before the first `+` or digit. Catches the
+      // standard `tel:` prefix as well as the rarer `tel` (no
+      // colon) and stray whitespace, so the card never displays
+      // "tel+..." or similar artefacts.
+      phone = (l.url || "").replace(/^[^+\d]+/, "").trim();
     }
     if (email && phone) break;
   }
@@ -66,8 +73,11 @@ export default function BusinessCard({
   const textSecondary =
     themeVars["--theme-text-secondary"] || "rgba(255,255,255,0.72)";
 
-  const name = truncate(profile?.name || "Your name", 26);
-  const title = truncate(profile?.title || "", 36);
+  // Tighter caps so the name + title can't overrun the QR column at
+  // the chosen font sizes. The clip-path below catches anything that
+  // does slip through (e.g. unusually wide glyphs).
+  const name = truncate(profile?.name || "Your name", 18);
+  const title = truncate(profile?.title || "", 30);
   const url = (profileUrl || "").replace(/^https?:\/\//, "");
   const { email, phone } = pickContact(profile?.links);
 
@@ -83,6 +93,12 @@ export default function BusinessCard({
   const qrSize = 200;
   const qrX = W - PAD - qrSize;
   const qrY = (H - qrSize) / 2;
+
+  // Bounds of the info column. The clip-path uses these so any text
+  // that does overrun the cap is cut at the edge of the column rather
+  // than running into the QR plate.
+  const infoX = PAD + 240;
+  const infoW = qrX - 24 - infoX;
 
   return (
     <svg
@@ -112,6 +128,9 @@ export default function BusinessCard({
         </radialGradient>
         <clipPath id="bc-avatar-clip">
           <circle cx={avatarCx} cy={avatarCy} r={avatarR} />
+        </clipPath>
+        <clipPath id="bc-info-clip">
+          <rect x={infoX} y={0} width={infoW} height={H} />
         </clipPath>
       </defs>
 
@@ -166,19 +185,21 @@ export default function BusinessCard({
         </>
       )}
 
-      {/* Info column */}
+      {/* Info column. The clip-path is the safety net for unusually
+          wide glyphs that slip past the character caps above. */}
       <g
         fontFamily="system-ui, -apple-system, Segoe UI, Roboto, sans-serif"
         fill={textPrimary}
+        clipPath="url(#bc-info-clip)"
       >
-        <text x={PAD + 240} y={H / 2 - 40} fontSize="52" fontWeight="800">
+        <text x={infoX} y={H / 2 - 40} fontSize="44" fontWeight="800">
           {name}
         </text>
         {title && (
           <text
-            x={PAD + 240}
+            x={infoX}
             y={H / 2}
-            fontSize="22"
+            fontSize="20"
             fontWeight="500"
             fill={textSecondary}
           >
@@ -186,24 +207,24 @@ export default function BusinessCard({
           </text>
         )}
         {email && (
-          <text x={PAD + 240} y={H / 2 + 50} fontSize="18" fill={textSecondary}>
-            {truncate(email, 38)}
+          <text x={infoX} y={H / 2 + 50} fontSize="18" fill={textSecondary}>
+            {truncate(email, 32)}
           </text>
         )}
         {phone && (
-          <text x={PAD + 240} y={H / 2 + 80} fontSize="18" fill={textSecondary}>
+          <text x={infoX} y={H / 2 + 80} fontSize="18" fill={textSecondary}>
             {phone}
           </text>
         )}
         {url && (
           <text
-            x={PAD + 240}
+            x={infoX}
             y={H / 2 + 110}
             fontSize="18"
             fontWeight="600"
             fill={accent}
           >
-            {truncate(url, 38)}
+            {truncate(url, 32)}
           </text>
         )}
       </g>
