@@ -102,8 +102,12 @@ export default function PublicCard() {
     }
   }, [profile, notFound]);
 
+  // Pass `{}` (not `null`) so getThemeCSS returns the full set of
+  // default `--theme-*` vars when the profile has no custom theme.
+  // Otherwise the marketing-CTA template literals below interpolate
+  // `undefined` into things like `${accent}33` -> "undefined33".
   const themeVars = useMemo(
-    () => getThemeCSS(profile?.themeJson || null),
+    () => getThemeCSS(profile?.themeJson || {}),
     [profile?.themeJson]
   );
 
