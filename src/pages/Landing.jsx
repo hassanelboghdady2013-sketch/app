@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Wifi,
@@ -14,7 +14,11 @@ import {
   Send,
   Menu,
   X,
+  ShoppingBag,
+  LayoutDashboard,
 } from "lucide-react";
+import { useAuth } from "../contexts/AuthContext";
+import { subscribeSiteSettings, isLikelyUrl } from "../lib/siteSettings";
 import { FaGithub, FaXTwitter, FaInstagram } from "react-icons/fa6";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
@@ -165,6 +169,19 @@ function PhoneMock() {
 
 export default function Landing() {
   const [navOpen, setNavOpen] = useState(false);
+  const { user } = useAuth();
+  // Shop URL read from the public settings/site doc. Admins edit it
+  // from /admin/codes so the Landing + public-profile CTAs can be
+  // re-pointed without a code change.
+  const [shopUrl, setShopUrl] = useState("");
+
+  useEffect(() => {
+    return subscribeSiteSettings((data) => {
+      setShopUrl(data?.shopUrl || "");
+    });
+  }, []);
+
+  const shopHref = isLikelyUrl(shopUrl) ? shopUrl : null;
 
   return (
     <div className="min-h-screen bg-app text-fg">
@@ -183,15 +200,39 @@ export default function Landing() {
             </a>
           </div>
           <div className="hidden md:flex items-center gap-3">
-            <Link
-              to="/login"
-              className="text-sm text-muted hover:text-fg transition-colors"
-            >
-              Log in
-            </Link>
-            <Button as={Link} to="/register" size="md">
-              Get started
-            </Button>
+            {shopHref && (
+              <a
+                href={shopHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-muted hover:text-fg transition-colors inline-flex items-center gap-1.5"
+              >
+                <ShoppingBag size={14} />
+                Buy a card
+              </a>
+            )}
+            {user ? (
+              <Button
+                as={Link}
+                to="/dashboard"
+                size="md"
+                leftIcon={<LayoutDashboard size={15} />}
+              >
+                Dashboard
+              </Button>
+            ) : (
+              <>
+                <Link
+                  to="/login"
+                  className="text-sm text-muted hover:text-fg transition-colors"
+                >
+                  Log in
+                </Link>
+                <Button as={Link} to="/register" size="md">
+                  Get started
+                </Button>
+              </>
+            )}
           </div>
           <button
             type="button"
@@ -220,13 +261,39 @@ export default function Landing() {
               >
                 How it works
               </a>
+              {shopHref && (
+                <a
+                  href={shopHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setNavOpen(false)}
+                  className="block py-2 text-sm text-muted hover:text-fg inline-flex items-center gap-1.5"
+                >
+                  <ShoppingBag size={14} />
+                  Buy a card
+                </a>
+              )}
               <div className="flex gap-2 pt-2">
-                <Button as={Link} to="/login" variant="outline" size="md" className="flex-1">
-                  Log in
-                </Button>
-                <Button as={Link} to="/register" size="md" className="flex-1">
-                  Get started
-                </Button>
+                {user ? (
+                  <Button
+                    as={Link}
+                    to="/dashboard"
+                    size="md"
+                    className="flex-1"
+                    leftIcon={<LayoutDashboard size={15} />}
+                  >
+                    Dashboard
+                  </Button>
+                ) : (
+                  <>
+                    <Button as={Link} to="/login" variant="outline" size="md" className="flex-1">
+                      Log in
+                    </Button>
+                    <Button as={Link} to="/register" size="md" className="flex-1">
+                      Get started
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -260,9 +327,23 @@ export default function Landing() {
                 <Button as={Link} to="/register" size="xl" rightIcon={<ArrowRight size={16} />}>
                   Get started — free
                 </Button>
-                <Button as="a" href="#features" variant="outline" size="xl">
-                  See how it works
-                </Button>
+                {shopHref ? (
+                  <Button
+                    as="a"
+                    href={shopHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    variant="outline"
+                    size="xl"
+                    leftIcon={<ShoppingBag size={16} />}
+                  >
+                    Buy a card
+                  </Button>
+                ) : (
+                  <Button as="a" href="#features" variant="outline" size="xl">
+                    See how it works
+                  </Button>
+                )}
               </div>
               <div className="grid grid-cols-3 max-w-md mx-auto lg:mx-0 gap-6 text-center lg:text-left">
                 <div>
@@ -425,9 +506,29 @@ export default function Landing() {
               <p className="text-muted mb-8 max-w-md mx-auto">
                 Get your digital portfolio live today. No credit card. No code.
               </p>
-              <Button as={Link} to="/register" size="xl" rightIcon={<ArrowRight size={16} />}>
-                Get started — free
-              </Button>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <Button
+                  as={Link}
+                  to="/register"
+                  size="xl"
+                  rightIcon={<ArrowRight size={16} />}
+                >
+                  Get started — free
+                </Button>
+                {shopHref && (
+                  <Button
+                    as="a"
+                    href={shopHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    variant="outline"
+                    size="xl"
+                    leftIcon={<ShoppingBag size={16} />}
+                  >
+                    Buy a Mo Tech card
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         </div>

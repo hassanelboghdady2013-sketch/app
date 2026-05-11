@@ -21,19 +21,24 @@ import {
 //   - "url"   (default): user types a full URL.
 //   - "email": user types just an email; we store as `mailto:<email>`.
 //   - "tel":   user types just a phone number; we store as `tel:<digits>`.
+// Brand colour and a single-character glyph for each platform. Used
+// by the SVG business card (which can't render react-icons) so the
+// social row still shows recognisable brand-coloured chips.
 const platforms = [
-  { id: "linkedin", label: "LinkedIn", icon: FaLinkedin, placeholder: "https://linkedin.com/in/yourname" },
-  { id: "github", label: "GitHub", icon: FaGithub, placeholder: "https://github.com/yourname" },
-  { id: "twitter", label: "Twitter / X", icon: FaXTwitter, placeholder: "https://x.com/yourname" },
-  { id: "instagram", label: "Instagram", icon: FaInstagram, placeholder: "https://instagram.com/yourname" },
-  { id: "facebook", label: "Facebook", icon: FaFacebook, placeholder: "https://facebook.com/yourname" },
-  { id: "snapchat", label: "Snapchat", icon: FaSnapchat, placeholder: "https://snapchat.com/add/yourname" },
-  { id: "tiktok", label: "TikTok", icon: FaTiktok, placeholder: "https://tiktok.com/@yourname" },
-  { id: "youtube", label: "YouTube", icon: FaYoutube, placeholder: "https://youtube.com/@yourname" },
+  { id: "linkedin", label: "LinkedIn", icon: FaLinkedin, brandColor: "#0a66c2", brandGlyph: "in", placeholder: "https://linkedin.com/in/yourname" },
+  { id: "github", label: "GitHub", icon: FaGithub, brandColor: "#171515", brandGlyph: "GH", placeholder: "https://github.com/yourname" },
+  { id: "twitter", label: "Twitter / X", icon: FaXTwitter, brandColor: "#000000", brandGlyph: "X", placeholder: "https://x.com/yourname" },
+  { id: "instagram", label: "Instagram", icon: FaInstagram, brandColor: "#e1306c", brandGlyph: "Ig", placeholder: "https://instagram.com/yourname" },
+  { id: "facebook", label: "Facebook", icon: FaFacebook, brandColor: "#1877f2", brandGlyph: "f", placeholder: "https://facebook.com/yourname" },
+  { id: "snapchat", label: "Snapchat", icon: FaSnapchat, brandColor: "#fffc00", brandGlyph: "Sc", brandFg: "#000000", placeholder: "https://snapchat.com/add/yourname" },
+  { id: "tiktok", label: "TikTok", icon: FaTiktok, brandColor: "#010101", brandGlyph: "TT", placeholder: "https://tiktok.com/@yourname" },
+  { id: "youtube", label: "YouTube", icon: FaYoutube, brandColor: "#ff0000", brandGlyph: "YT", placeholder: "https://youtube.com/@yourname" },
   {
     id: "email",
     label: "Email",
     icon: FaEnvelope,
+    brandColor: "#6b7280",
+    brandGlyph: "@",
     placeholder: "you@example.com",
     inputMode: "email",
   },
@@ -41,15 +46,17 @@ const platforms = [
     id: "phone",
     label: "Phone",
     icon: FaPhone,
+    brandColor: "#10b981",
+    brandGlyph: "☎",
     placeholder: "+20 100 123 4567",
     inputMode: "tel",
   },
-  { id: "whatsapp", label: "WhatsApp", icon: FaWhatsapp, placeholder: "https://wa.me/1234567890" },
-  { id: "telegram", label: "Telegram", icon: FaTelegram, placeholder: "https://t.me/yourname" },
-  { id: "website", label: "Website", icon: FaGlobe, placeholder: "https://yourwebsite.com" },
-  { id: "behance", label: "Behance", icon: FaBehance, placeholder: "https://behance.net/yourname" },
-  { id: "dribbble", label: "Dribbble", icon: FaDribbble, placeholder: "https://dribbble.com/yourname" },
-  { id: "custom", label: "Custom", icon: FaLink, placeholder: "https://example.com" },
+  { id: "whatsapp", label: "WhatsApp", icon: FaWhatsapp, brandColor: "#25d366", brandGlyph: "Wa", placeholder: "https://wa.me/1234567890" },
+  { id: "telegram", label: "Telegram", icon: FaTelegram, brandColor: "#229ed9", brandGlyph: "Tg", placeholder: "https://t.me/yourname" },
+  { id: "website", label: "Website", icon: FaGlobe, brandColor: "#64748b", brandGlyph: "Www", placeholder: "https://yourwebsite.com" },
+  { id: "behance", label: "Behance", icon: FaBehance, brandColor: "#1769ff", brandGlyph: "Be", placeholder: "https://behance.net/yourname" },
+  { id: "dribbble", label: "Dribbble", icon: FaDribbble, brandColor: "#ea4c89", brandGlyph: "Dr", placeholder: "https://dribbble.com/yourname" },
+  { id: "custom", label: "Custom", icon: FaLink, brandColor: "#64748b", brandGlyph: "•", placeholder: "https://example.com" },
 ];
 
 export default platforms;

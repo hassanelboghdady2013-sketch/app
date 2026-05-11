@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useOutletContext, Link } from "react-router-dom";
-import { Download, Share2, Copy, Check, ExternalLink } from "lucide-react";
+import { Download, Share2, Copy, Check, ExternalLink, IdCard } from "lucide-react";
 import toast from "react-hot-toast";
 import Card from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
@@ -32,6 +32,12 @@ export default function CardSection() {
 
   const profileUrl = profile?.username
     ? `${window.location.origin}/${profile.username}`
+    : "";
+  // Dedicated card page — shareable URL that opens just the card,
+  // not the full link tree. Useful when someone wants to send the
+  // graphic card itself to a customer or a friend.
+  const cardPageUrl = profile?.username
+    ? `${window.location.origin}/card/${profile.username}`
     : "";
 
   // Pass `links` down on the profile object so BusinessCard can pull
@@ -90,8 +96,9 @@ export default function CardSection() {
 
   async function handleCopyUrl() {
     try {
-      await navigator.clipboard.writeText(profileUrl);
+      await navigator.clipboard.writeText(cardPageUrl);
       setCopied(true);
+      toast.success("Card page URL copied");
       setTimeout(() => setCopied(false), 1500);
     } catch {
       toast.error("Couldn't copy");
@@ -169,7 +176,17 @@ export default function CardSection() {
                 )
               }
             >
-              {copied ? "Copied" : "Copy URL"}
+              {copied ? "Copied" : "Copy card URL"}
+            </Button>
+            <Button
+              variant="ghost"
+              as="a"
+              href={cardPageUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              leftIcon={<IdCard size={16} />}
+            >
+              Open card page
             </Button>
             <Button
               variant="ghost"
@@ -179,17 +196,23 @@ export default function CardSection() {
               rel="noopener noreferrer"
               leftIcon={<ExternalLink size={16} />}
             >
-              Open profile
+              Open full profile
             </Button>
           </div>
 
           <Card padding="md">
             <p className="text-xs text-muted leading-relaxed">
               The card uses your <strong>theme colours</strong>, your{" "}
-              <strong>name</strong>, your <strong>title</strong>, and the
-              first email + phone link from your Links tab. The QR scans
-              straight to your public profile. Update any of those fields
-              and the card refreshes — no extra step.
+              <strong>name</strong>, your <strong>title</strong>, the
+              first email + phone link from your Links tab, plus
+              brand-coloured chips for your other socials. The QR scans
+              straight to your public profile. You also get a shareable
+              card-only page at{" "}
+              <code className="text-fg">
+                /card/{profile?.username || "yourname"}
+              </code>{" "}
+              — copy the URL above to send the card itself instead of
+              the full link tree.
             </p>
           </Card>
         </>

@@ -12,6 +12,8 @@ import {
   Plus,
   ExternalLink,
   LogOut,
+  ShoppingBag,
+  Save,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import {
@@ -20,6 +22,11 @@ import {
   deleteInviteCode,
   fetchUserEmails,
 } from "../../lib/inviteCodes";
+import {
+  subscribeSiteSettings,
+  setShopUrl,
+  isLikelyUrl,
+} from "../../lib/siteSettings";
 import Logo from "../../components/ui/Logo";
 import Button from "../../components/ui/Button";
 import Input from "../../components/ui/Input";
@@ -164,6 +171,11 @@ export default function AdminCodes() {
   // uid -> email looked up from users/{uid} for codes claimed before
   // claimedEmail was being persisted on the code doc.
   const [resolvedEmails, setResolvedEmails] = useState({});
+  // Site-wide shop URL. The Landing CTA + public-profile footer
+  // read this so users can buy a card without a code change.
+  const [shopUrlDraft, setShopUrlDraft] = useState("");
+  const [shopUrlSaved, setShopUrlSaved] = useState("");
+  const [shopUrlSaving, setShopUrlSaving] = useState(false);
 
   useEffect(() => {
     document.title = "Invite codes — Mo Tech admin";
@@ -203,6 +215,36 @@ export default function AdminCodes() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh();
   }, [refresh]);
+
+  // Subscribe to the singleton site-settings doc so the Save form
+  // hydrates with whatever's currently live, and we can detect
+  // unsaved changes.
+  useEffect(() => {
+    const unsub = subscribeSiteSettings((data) => {
+      const url = data?.shopUrl || "";
+      setShopUrlSaved(url);
+      setShopUrlDraft((prev) => (prev === "" ? url : prev));
+    });
+    return unsub;
+  }, []);
+
+  async function handleSaveShopUrl(e) {
+    e.preventDefault();
+    const trimmed = shopUrlDraft.trim();
+    if (trimmed && !isLikelyUrl(trimmed)) {
+      toast.error("Enter a full URL starting with http:// or https://");
+      return;
+    }
+    setShopUrlSaving(true);
+    try {
+      await setShopUrl(trimmed);
+      toast.success(trimmed ? "Shop link saved" : "Shop link cleared");
+    } catch (err) {
+      toast.error(err.message || "Failed to save");
+    } finally {
+      setShopUrlSaving(false);
+    }
+  }
 
   const stats = useMemo(() => {
     const total = rows.length;
@@ -352,6 +394,53 @@ export default function AdminCodes() {
           <StatTile label="Claimed" value={stats.claimed} tone="success" />
           <StatTile label="Claimed today" value={stats.today} />
         </div>
+
+        {/* Site settings */}
+        <Card padding="lg">
+          <div className="mb-4">
+            <h2
+              className="text-lg font-semibold flex items-center gap-2"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              <ShoppingBag size={16} className="text-brand" />
+              Shop link
+            </h2>
+            <p className="text-sm text-muted mt-0.5">
+              Where the &ldquo;Buy a card&rdquo; buttons on the landing
+              page and the &ldquo;Get your own card&rdquo; footer on
+              every public profile point. Leave blank to hide the
+              buttons.
+            </p>
+          </div>
+          <form
+            onSubmit={handleSaveShopUrl}
+            className="flex flex-col sm:flex-row gap-3 items-end"
+          >
+            <div className="flex-1 w-full">
+              <Input
+                label="Shop URL"
+                type="url"
+                inputMode="url"
+                placeholder="https://shop.example.com/mo-tech-card"
+                value={shopUrlDraft}
+                onChange={(e) => setShopUrlDraft(e.target.value)}
+                hint={
+                  shopUrlSaved
+                    ? `Currently live: ${shopUrlSaved}`
+                    : "Not set — buy-the-card buttons are hidden."
+                }
+              />
+            </div>
+            <Button
+              type="submit"
+              loading={shopUrlSaving}
+              disabled={shopUrlSaving || shopUrlDraft.trim() === shopUrlSaved}
+              leftIcon={<Save size={15} />}
+            >
+              Save
+            </Button>
+          </form>
+        </Card>
 
         {/* Generate */}
         <Card padding="lg">

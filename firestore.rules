@@ -86,6 +86,15 @@ service cloud.firestore {
         && (!("claimedBy" in resource.data) || resource.data.claimedBy == null);
     }
 
+    // Singleton site-wide settings (currently just the shop URL the
+    // landing CTA links to). Public-readable so unauthenticated
+    // landing visitors can see the CTA; admin-only write so a
+    // typical user can't redirect buyers somewhere malicious.
+    match /settings/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     match /pageViews/{id} {
       allow read: if request.auth != null;
       allow create: if true;
