@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import {
@@ -176,6 +176,9 @@ export default function AdminCodes() {
   const [shopUrlDraft, setShopUrlDraft] = useState("");
   const [shopUrlSaved, setShopUrlSaved] = useState("");
   const [shopUrlSaving, setShopUrlSaving] = useState(false);
+  // Distinct from "draft is empty" so a user-cleared input isn't
+  // overwritten when a concurrent snapshot arrives.
+  const shopUrlHydratedRef = useRef(false);
 
   useEffect(() => {
     document.title = "Invite codes — Mo Tech admin";
@@ -218,12 +221,19 @@ export default function AdminCodes() {
 
   // Subscribe to the singleton site-settings doc so the Save form
   // hydrates with whatever's currently live, and we can detect
-  // unsaved changes.
+  // unsaved changes. We only seed the draft once — subsequent
+  // snapshots update `shopUrlSaved` (used for the hint + unsaved-
+  // changes detection) but never touch the in-progress draft, so a
+  // user who has cleared/edited the input never sees their edit
+  // clobbered by a concurrent admin's write.
   useEffect(() => {
     const unsub = subscribeSiteSettings((data) => {
       const url = data?.shopUrl || "";
       setShopUrlSaved(url);
-      setShopUrlDraft((prev) => (prev === "" ? url : prev));
+      if (!shopUrlHydratedRef.current) {
+        shopUrlHydratedRef.current = true;
+        setShopUrlDraft(url);
+      }
     });
     return unsub;
   }, []);
