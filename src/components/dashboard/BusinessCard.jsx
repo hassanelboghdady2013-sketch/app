@@ -20,6 +20,32 @@ const W = 1050;
 const H = 600;
 const PAD = 60;
 
+// Platforms we render in the dedicated contact lines (email line +
+// phone line). They're surfaced as text, so we don't want a chip
+// for them too in the social row below.
+const CONTACT_PLATFORMS = new Set(["email", "phone"]);
+
+// Cap on chips so the row stays a single line at the widths we ship
+// — anything beyond starts wrapping into the QR plate. Users
+// typically only have 4–6 socials anyway.
+const MAX_SOCIAL_CHIPS = 6;
+
+/**
+ * Pick the social-style links to show as brand-coloured chips on
+ * the card. Excludes email/phone (already shown as text) and any
+ * link the user has explicitly toggled off.
+ */
+function pickSocials(links) {
+  return (links || [])
+    .filter((l) => l.active !== false)
+    .filter((l) => !CONTACT_PLATFORMS.has(l.platform))
+    .slice(0, MAX_SOCIAL_CHIPS)
+    .map((l) => ({
+      id: l.id,
+      platform: getPlatform(l.platform),
+    }));
+}
+
 /**
  * Pull the first email + phone from the user's active links so we can
  * surface them on the card without making the user re-enter their
@@ -80,6 +106,7 @@ export default function BusinessCard({
   const title = truncate(profile?.title || "", 30);
   const url = (profileUrl || "").replace(/^https?:\/\//, "");
   const { email, phone } = pickContact(profile?.links);
+  const socials = pickSocials(profile?.links);
 
   // Initial used as the avatar fallback when there's no avatarUrl.
   const initial = (profile?.name || "?").trim().charAt(0).toUpperCase();
@@ -228,6 +255,45 @@ export default function BusinessCard({
           </text>
         )}
       </g>
+
+      {/* Social chips. Brand-coloured circles with a short glyph so
+          the card still reads at print resolution. We can't embed
+          react-icons here without paying the cost of inlining their
+          SVG paths, and a glyph chip is more readable on a wallet-
+          sized printed card anyway. */}
+      {socials.length > 0 && (
+        <g clipPath="url(#bc-info-clip)">
+          {socials.map(({ id, platform }, i) => {
+            const chipR = 18;
+            const chipGap = 12;
+            const cx = infoX + chipR + i * (chipR * 2 + chipGap);
+            const cy = H / 2 + 152;
+            const fg = platform.brandFg || "#ffffff";
+            const fill = platform.brandColor || accent;
+            const glyph = platform.brandGlyph || platform.label?.[0] || "•";
+            // Glyph length drives the font size so two-letter labels
+            // ("YT", "Be") fit alongside single-letter ones ("f", "X").
+            const fontSize =
+              glyph.length <= 1 ? 18 : glyph.length === 2 ? 14 : 11;
+            return (
+              <g key={id}>
+                <circle cx={cx} cy={cy} r={chipR} fill={fill} />
+                <text
+                  x={cx}
+                  y={cy + fontSize / 3}
+                  textAnchor="middle"
+                  fontFamily="system-ui, -apple-system, Segoe UI, Roboto, sans-serif"
+                  fontSize={fontSize}
+                  fontWeight="700"
+                  fill={fg}
+                >
+                  {glyph}
+                </text>
+              </g>
+            );
+          })}
+        </g>
+      )}
 
       {/* QR code on the right. Renders inside a white rounded square
           for guaranteed scanner contrast on dark themes too. SVG nested

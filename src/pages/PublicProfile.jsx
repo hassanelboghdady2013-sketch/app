@@ -14,7 +14,8 @@ import {
 import { db } from "../firebase";
 import { getPlatform } from "../lib/platforms";
 import { getThemeCSS } from "../lib/themes";
-import { Share2, Download, ChevronRight, Copy, Check, QrCode } from "lucide-react";
+import { Share2, Download, ChevronRight, Copy, Check, QrCode, ShoppingBag, ArrowRight } from "lucide-react";
+import { subscribeSiteSettings, isLikelyUrl } from "../lib/siteSettings";
 import { QRCodeSVG } from "qrcode.react";
 import SkeletonLoader from "../components/ui/SkeletonLoader";
 import { downloadQrAsPng } from "../lib/qrDownload";
@@ -76,6 +77,15 @@ export default function PublicProfile() {
   const [notFound, setNotFound] = useState(false);
   const [showQR, setShowQR] = useState(false);
   const [copied, setCopied] = useState(false);
+  // Site-wide shop URL for the marketing CTA at the bottom. Falls
+  // back to /register if the admin hasn't configured a shop link.
+  const [shopUrl, setShopUrl] = useState("");
+
+  useEffect(() => {
+    return subscribeSiteSettings((data) => {
+      setShopUrl(data?.shopUrl || "");
+    });
+  }, []);
 
   useEffect(() => {
     async function fetchProfile() {
@@ -341,6 +351,7 @@ export default function PublicProfile() {
   const cssVars = getThemeCSS(theme);
   const accent = cssVars["--theme-accent"] || "#2563eb";
   const bg = cssVars["--theme-bg"] || "#0a1628";
+  const textPrimary = cssVars["--theme-text"] || "#ffffff";
   const textSecondary = cssVars["--theme-text-secondary"] || "rgba(255,255,255,0.7)";
   const cardBg = cssVars["--theme-card-bg"] || "rgba(255,255,255,0.06)";
   const cardBorder = cssVars["--theme-card-border"] || "rgba(255,255,255,0.1)";
@@ -572,8 +583,55 @@ export default function PublicProfile() {
           </p>
         )}
 
+        {/* Marketing CTA. Pushes a "Get your own Mo Tech card" card
+            on every public-profile view to convert visitors. Theme-
+            aware so it blends with the user's chosen palette. */}
+        <div className="mt-14">
+          <a
+            href={isLikelyUrl(shopUrl) ? shopUrl : "/register"}
+            target={isLikelyUrl(shopUrl) ? "_blank" : undefined}
+            rel={isLikelyUrl(shopUrl) ? "noopener noreferrer" : undefined}
+            className="group block rounded-2xl p-5 transition-transform hover:scale-[1.01]"
+            style={{
+              backgroundColor: "rgba(255,255,255,0.04)",
+              border: `1px solid ${accent}33`,
+            }}
+          >
+            <div className="flex items-center gap-4">
+              <div
+                className="w-11 h-11 rounded-xl grid place-items-center shrink-0"
+                style={{ backgroundColor: `${accent}22`, color: accent }}
+              >
+                {isLikelyUrl(shopUrl) ? (
+                  <ShoppingBag size={20} />
+                ) : (
+                  <ArrowRight size={20} />
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p
+                  className="font-semibold text-[15px] tracking-tight"
+                  style={{ color: textPrimary }}
+                >
+                  {isLikelyUrl(shopUrl)
+                    ? "Get your own Mo Tech card"
+                    : "Create your own Mo Tech profile"}
+                </p>
+                <p className="text-xs mt-0.5" style={{ color: textSecondary }}>
+                  NFC smart cards · Tap to share · Live analytics
+                </p>
+              </div>
+              <ChevronRight
+                size={18}
+                style={{ color: textSecondary }}
+                className="shrink-0 group-hover:translate-x-0.5 transition-transform"
+              />
+            </div>
+          </a>
+        </div>
+
         {/* Footer */}
-        <div className="mt-14 text-center">
+        <div className="mt-8 text-center">
           <a
             href="/"
             className="text-xs font-medium transition-colors hover:opacity-80"

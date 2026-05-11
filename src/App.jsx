@@ -14,6 +14,7 @@ import AppearanceSection from "./pages/dashboard/AppearanceSection";
 import AnalyticsSection from "./pages/dashboard/AnalyticsSection";
 import AdminCodes from "./pages/admin/AdminCodes";
 import PublicProfile from "./pages/PublicProfile";
+import PublicCard from "./pages/PublicCard";
 
 export default function App() {
   return (
@@ -61,6 +62,10 @@ export default function App() {
               </AdminRoute>
             }
           />
+          {/* /card/:username must come before the catch-all
+              /:username route so a username of "card" can't shadow
+              the standalone card page. */}
+          <Route path="/card/:username" element={<PublicCard />} />
           <Route path="/:username" element={<PublicProfile />} />
         </Routes>
       </BrowserRouter>
