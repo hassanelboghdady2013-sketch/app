@@ -1,4 +1,10 @@
-import { doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  setDoc,
+  onSnapshot,
+  serverTimestamp,
+} from "firebase/firestore";
 import { db } from "../firebase";
 
 /**
@@ -39,7 +45,7 @@ export async function setShopUrl(shopUrl) {
     SITE_SETTINGS_DOC,
     {
       shopUrl: shopUrl || "",
-      updatedAt: new Date(),
+      updatedAt: serverTimestamp(),
     },
     { merge: true }
   );

@@ -267,7 +267,7 @@ export default function Landing() {
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() => setNavOpen(false)}
-                  className="block py-2 text-sm text-muted hover:text-fg inline-flex items-center gap-1.5"
+                  className="flex py-2 text-sm text-muted hover:text-fg items-center gap-1.5"
                 >
                   <ShoppingBag size={14} />
                   Buy a card
