@@ -8,6 +8,7 @@ import {
   signInWithRedirect,
   getRedirectResult,
   signOut,
+  sendPasswordResetEmail,
 } from "firebase/auth";
 import { auth, googleProvider } from "../firebase";
 
@@ -65,7 +66,28 @@ export function AuthProvider({ children }) {
     await signOut(auth);
   }
 
-  const value = { user, loading, register, login, loginWithGoogle, logout };
+  // Triggers Firebase's built-in password-reset email flow. The
+  // recipient gets a magic link that opens Firebase's password-reset
+  // page, where they set a new password. No backend or third-party
+  // mailer required.
+  //
+  // Note: with Firebase's "Email enumeration protection" enabled
+  // (default on new projects), this succeeds even for unknown
+  // emails so attackers can't enumerate accounts. The UI surfaces a
+  // generic success message regardless of the underlying result.
+  async function resetPassword(email) {
+    await sendPasswordResetEmail(auth, email);
+  }
+
+  const value = {
+    user,
+    loading,
+    register,
+    login,
+    loginWithGoogle,
+    logout,
+    resetPassword,
+  };
 
   return (
     <AuthContext.Provider value={value}>

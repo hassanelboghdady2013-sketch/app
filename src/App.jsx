@@ -6,6 +6,7 @@ import AdminRoute from "./components/AdminRoute";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import ForgotPassword from "./pages/ForgotPassword";
 import DashboardLayout from "./pages/dashboard/DashboardLayout";
 import ProfileSection from "./pages/dashboard/ProfileSection";
 import LinksSection from "./pages/dashboard/LinksSection";
@@ -39,6 +40,7 @@ export default function App() {
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route
             path="/dashboard"
             element={

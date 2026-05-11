@@ -150,25 +150,35 @@ export default function Login() {
           required
           placeholder="you@example.com"
         />
-        <Input
-          label="Password"
-          type={showPassword ? "text" : "password"}
-          autoComplete="current-password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          placeholder="Enter your password"
-          rightSlot={
-            <button
-              type="button"
-              aria-label={showPassword ? "Hide password" : "Show password"}
-              onClick={() => setShowPassword((s) => !s)}
-              className="w-8 h-8 grid place-items-center rounded-md text-faint hover:text-fg hover:bg-card-hi transition-colors"
+        <div>
+          <Input
+            label="Password"
+            type={showPassword ? "text" : "password"}
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            placeholder="Enter your password"
+            rightSlot={
+              <button
+                type="button"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                onClick={() => setShowPassword((s) => !s)}
+                className="w-8 h-8 grid place-items-center rounded-md text-faint hover:text-fg hover:bg-card-hi transition-colors"
+              >
+                {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+              </button>
+            }
+          />
+          <div className="mt-1.5 text-right">
+            <Link
+              to="/forgot-password"
+              className="text-xs text-muted hover:text-fg transition-colors"
             >
-              {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
-            </button>
-          }
-        />
+              Forgot password?
+            </Link>
+          </div>
+        </div>
         <Button type="submit" size="lg" loading={loading} className="w-full">
           {loading ? "Signing in…" : "Sign in"}
         </Button>
